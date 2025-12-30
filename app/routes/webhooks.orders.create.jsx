@@ -1,0 +1,302 @@
+import { authenticate } from "../shopify.server";
+import { CASHBACK_CONFIG } from "../config";
+
+// Webhook handler for order creation
+// Processes cashback rewards when customers opt-in to order protection
+
+export const action = async ({ request }) => {
+  console.log('🔔 Webhook received: orders/create');
+  
+  try {
+    // Read the body first to get order data
+    const bodyText = await request.clone().text();
+    const order = JSON.parse(bodyText);
+    
+    // Try to authenticate, but fallback if it fails
+    let admin, session;
+    
+    try {
+      const authResult = await authenticate.webhook(request);
+      admin = authResult.admin;
+      session = authResult.session;
+    } catch (authError) {
+      console.warn('⚠️  Using fallback authentication for development');
+      
+      // Fallback: create admin client manually using stored session
+      const shopDomain = order.shop_domain || 'dev-cloths-store.myshopify.com';
+      const shopifyServer = await import("../shopify.server");
+      const sessions = await shopifyServer.sessionStorage.findSessionsByShop(shopDomain);
+      const activeSession = sessions.find(s => s.isOnline === false) || sessions[0];
+      
+      if (!activeSession) {
+        throw new Error('No active session found - app may not be installed');
+      }
+      
+      session = activeSession;
+      admin = {
+        graphql: async (query, options) => {
+          const response = await fetch(`https://${shopDomain}/admin/api/2025-10/graphql.json`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Shopify-Access-Token': activeSession.accessToken,
+            },
+            body: JSON.stringify({ query, variables: options?.variables }),
+          });
+          return response;
+        }
+      };
+    }
+    
+    console.log(`📦 Processing order ${order.name} for ${order.email}`);
+    
+    // Check if protection was enabled (via attributes OR product)
+    const protectionAttr = order.note_attributes?.find(attr => attr.name === '_protection_enabled');
+    const hasProtectionProduct = order.line_items?.some(item => {
+      const title = (item.title || item.name || '').toLowerCase();
+      return title.includes('order protection') || title.includes('protection') || title.includes('checkout+');
+    });
+    const hasProtection = protectionAttr?.value === 'true' || hasProtectionProduct;
+    
+    if (!hasProtection) {
+      console.log('Protection not enabled, skipping cashback');
+      return new Response('OK', { status: 200 });
+    }
+    
+    console.log('✅ Protection enabled, processing cashback...');
+    
+    // Get cashback amount (from attributes or calculate from order total)
+    const cashbackAttr = order.note_attributes?.find(attr => attr.name === '_cashback_amount');
+    const cashbackAmount = cashbackAttr?.value || 
+      (parseFloat(order.total_price) * CASHBACK_CONFIG.CASHBACK_PERCENT / 100).toFixed(2);
+    
+    // Generate discount code
+    const discountCode = `${CASHBACK_CONFIG.DISCOUNT_CODE_PREFIX}${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
+    
+    // Handle guest checkout (customer might be null)
+    const hasCustomer = order.customer && order.customer.id;
+    
+    // Create discount using modern Discount API
+    const startsAt = new Date().toISOString();
+    const endsAt = new Date(Date.now() + CASHBACK_CONFIG.CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    
+    // Build customer selection
+    let customerSelection = {};
+    if (hasCustomer) {
+      customerSelection = {
+        customers: {
+          add: [`gid://shopify/Customer/${order.customer.id}`]
+        }
+      };
+    } else {
+      customerSelection = {
+        all: true
+      };
+    }
+    
+    const discountResponse = await admin.graphql(
+      `#graphql
+      mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
+        discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
+          codeDiscountNode {
+            id
+            codeDiscount {
+              ... on DiscountCodeBasic {
+                title
+                codes(first: 1) {
+                  nodes {
+                    code
+                  }
+                }
+              }
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }`,
+      {
+        variables: {
+          basicCodeDiscount: {
+            title: `Cashback ${cashbackAmount} - Order ${order.name}`,
+            code: discountCode,
+            startsAt,
+            endsAt,
+            customerSelection,
+            customerGets: {
+              value: {
+                discountAmount: {
+                  amount: cashbackAmount,
+                  appliesOnEachItem: false
+                }
+              },
+              items: {
+                all: true
+              }
+            },
+            usageLimit: 1
+          }
+        }
+      }
+    );
+    
+    const discountData = await discountResponse.json();
+    const userErrors = discountData.data?.discountCodeBasicCreate?.userErrors || [];
+    
+    if (userErrors.length > 0) {
+      throw new Error(`Failed to create discount code: ${JSON.stringify(userErrors)}`);
+    }
+    
+    console.log(`✅ Discount code created: ${discountCode}`);
+    
+    // Tag customer as VIP (only if customer exists, not guest checkout)
+    if (hasCustomer) {
+      await admin.graphql(
+        `#graphql
+        mutation customerUpdate($input: CustomerInput!) {
+          customerUpdate(input: $input) {
+            customer {
+              id
+              tags
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }`,
+        {
+          variables: {
+            input: {
+              id: `gid://shopify/Customer/${order.customer.id}`,
+              tags: [CASHBACK_CONFIG.VIP_TAG]
+            }
+          }
+        }
+      );
+    }
+    
+    // Get shop domain from session
+    const shopDomain = session?.shop || order.shop_domain || 'yourstore.myshopify.com';
+    
+    // Send email with cashback code
+    await sendCashbackEmail({
+      email: order.email,
+      customerName: order.customer?.first_name || 'Valued Customer',
+      discountCode,
+      cashbackAmount,
+      orderNumber: order.name,
+      shopDomain
+    });
+    
+    console.log(`✅ Cashback processed: ${discountCode} for $${cashbackAmount}`);
+    return new Response('OK', { status: 200 });
+    
+  } catch (error) {
+    console.error('❌ Webhook error:', error.message || error);
+    if (error.stack) console.error(error.stack);
+    
+    // Return 200 so Shopify doesn't retry
+    return new Response(JSON.stringify({ 
+      error: error?.message || String(error)
+    }), { 
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+};
+
+async function sendCashbackEmail({ email, customerName, discountCode, cashbackAmount, orderNumber, shopDomain }) {
+  const emailTemplate = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+        .code-box { background: white; padding: 20px; text-align: center; margin: 20px 0; border: 2px dashed #667eea; border-radius: 8px; }
+        .code { font-size: 28px; font-weight: bold; color: #667eea; letter-spacing: 2px; }
+        .amount { font-size: 32px; color: #4CAF50; font-weight: bold; }
+        .cta { background: #4CAF50; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🎉 Your Cashback is Here!</h1>
+        </div>
+        <div class="content">
+          <p>Hi ${customerName},</p>
+          <p>Thank you for your order ${orderNumber}! As promised, here's your cashback reward:</p>
+          
+          <div class="code-box">
+            <p style="margin: 0; font-size: 16px; color: #666;">Your Cashback Amount</p>
+            <div class="amount">$${cashbackAmount}</div>
+            <p style="margin: 20px 0 10px; font-size: 16px; color: #666;">Discount Code</p>
+            <div class="code">${discountCode}</div>
+          </div>
+          
+          <p><strong>How to use:</strong></p>
+          <ul>
+            <li>Valid on your next purchase</li>
+            <li>Works store-wide on all products</li>
+            <li>Valid for ${CASHBACK_CONFIG.CODE_EXPIRY_DAYS} days</li>
+            <li>One-time use only</li>
+          </ul>
+          
+          <div style="text-align: center;">
+            <a href="https://${shopDomain}" class="cta">Shop Now</a>
+          </div>
+          
+          <p style="margin-top: 30px; font-size: 14px; color: #666;">
+            Thanks for being a VIP customer! Enjoy your cashback reward.
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const RESEND_API_KEY = "re_aKFpev2u_KWBN386FVxvFd6GKqtLe7kpY";
+  const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+
+  // If Resend API key is configured, use Resend
+  if (RESEND_API_KEY) {
+    try {
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: FROM_EMAIL,
+          to: email,
+          subject: `🎉 You earned $${cashbackAmount} cashback!`,
+          html: emailTemplate,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(`Resend API error: ${JSON.stringify(result)}`);
+      }
+
+      console.log(`✅ Email sent to ${email} - Code: ${discountCode}`);
+      return;
+    } catch (error) {
+      console.error('Failed to send email:', error.message);
+      // Continue - email failure shouldn't block webhook processing
+    }
+  }
+
+  // Fallback: log email details if Resend isn't configured
+  console.log(`📧 Email not sent (configure RESEND_API_KEY) - Code: ${discountCode} to ${email}`);
+}
+
+

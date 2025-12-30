@@ -1,0 +1,15 @@
+api_version = "2025-01"
+
+[[extensions]]
+uid = "f123f505-842f-5f7b-5ab0-37d1cfbf9e073057f71c"
+type = "ui_extension"
+name = "checkout-protection"
+handle = "checkout-protection"
+
+[extensions.capabilities]
+api_access = true
+
+[[extensions.targeting]]
+module = "./src/Checkout.jsx"
+target = "purchase.checkout.cart-line-list.render-after"
+
