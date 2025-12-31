@@ -2,7 +2,7 @@
 
 client_id = "e051efa27d6d36cd1d66129ed595f4b9"
 name = "post-purchases-flow"
-application_url = "https://example.com"
+application_url = "https://shopify-post-purchases.vercel.app"
 embedded = true
 
 [build]
@@ -28,4 +28,4 @@ api_version = "2026-01"
 scopes = "write_products,read_orders,write_price_rules,write_discounts,write_customers"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://shopify-post-purchases.vercel.app/api/auth" ]
