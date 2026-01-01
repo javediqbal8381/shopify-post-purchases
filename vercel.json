@@ -1,7 +1,4 @@
 {
-  "buildCommand": "npm run setup && npm run build",
-  "installCommand": "npm install",
-  "framework": null,
-  "regions": ["sin1"]
+  "buildCommand": "npm run setup && npm run build"
 }
 
