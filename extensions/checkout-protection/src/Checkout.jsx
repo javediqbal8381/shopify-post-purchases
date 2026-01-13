@@ -23,51 +23,44 @@ function CheckoutProtection() {
   const INSURANCE_PERCENT = 4;
   const PROTECTION_HANDLE = 'order-protection';
   
+  // Store the protection variant ID dynamically
+  const [protectionVariantId, setProtectionVariantId] = useState(null);
+  
   // Calculate cart total (excluding protection)
   const cartTotal = cartLines.reduce((total, line) => {
-    if (line.merchandise.product.handle !== PROTECTION_HANDLE) {
-      return total + parseFloat(line.cost.totalAmount.amount);
+    // Skip protection product by checking merchandise ID
+    if (protectionVariantId && line.merchandise.id === protectionVariantId) {
+      return total;
     }
-    return total;
+    return total + parseFloat(line.cost.totalAmount.amount);
   }, 0);
   
   const insuranceFee = (cartTotal * INSURANCE_PERCENT / 100).toFixed(2);
   const cashbackAmount = (cartTotal * CASHBACK_PERCENT / 100).toFixed(2);
   
-  // Check if protection is in cart
+  // Check if protection is in cart by merchandise ID
   const protectionLine = cartLines.find(
-    line => {
-      // Check multiple ways to identify the product
-      const handle = line.merchandise?.product?.handle;
-      const title = line.merchandise?.product?.title;
-      const productId = line.merchandise?.product?.id;
-      
-      // Log for debugging
-      console.log('Cart line details:', {
-        id: line.id,
-        handle,
-        title,
-        productId,
-        merchandise: line.merchandise
-      });
-      
-      return handle === PROTECTION_HANDLE || 
-             title === 'Order Protection' ||
-             productId === 'gid://shopify/Product/8302842740871'; // The ID from your logs
-    }
+    line => protectionVariantId && line.merchandise.id === protectionVariantId
   );
   
-  console.log('Protection line found:', !!protectionLine);
+  console.log('🔍 Checking cart lines:');
+  console.log('  Protection variant ID:', protectionVariantId);
+  console.log('  Cart merchandise IDs:', cartLines.map(l => l.merchandise.id));
+  console.log('  Protection line found:', !!protectionLine);
   
   const [isChecked, setIsChecked] = useState(!!protectionLine);
   
   useEffect(() => {
     const hasProtection = !!protectionLine;
-    console.log('useEffect - Has protection:', hasProtection, 'Previous checked:', isChecked);
-    if (hasProtection !== isChecked) {
-      setIsChecked(hasProtection);
+    console.log('useEffect - Has protection:', hasProtection);
+    setIsChecked(hasProtection);
+    
+    // If protection is found and we don't have the variant ID yet, store it
+    if (protectionLine && !protectionVariantId) {
+      setProtectionVariantId(protectionLine.merchandise.id);
+      console.log('Stored protection variant ID from cart:', protectionLine.merchandise.id);
     }
-  }, [protectionLine, isChecked]);
+  }, [protectionLine, protectionVariantId]);
   
   const handleToggle = async (checked) => {
     console.log('Checkbox toggled:', checked);
@@ -121,6 +114,9 @@ function CheckoutProtection() {
           return;
         }
         
+        // Store the variant ID for future reference
+        setProtectionVariantId(variantId);
+        
         console.log('Adding product to cart with variant ID:', variantId);
         
         // Add protection product
@@ -156,49 +152,40 @@ function CheckoutProtection() {
         // Remove protection
         console.log('=== REMOVING PROTECTION ===');
         console.log('Current cart lines:', cartLines.length);
+        console.log('Protection line to remove:', protectionLine);
         
-        // Re-find the protection line - check multiple ways
-        const currentProtectionLine = cartLines.find(
-          line => {
-            const handle = line.merchandise?.product?.handle;
-            const title = line.merchandise?.product?.title;
-            const productId = line.merchandise?.product?.id;
-            
-            return handle === PROTECTION_HANDLE || 
-                   title === 'Order Protection' ||
-                   productId === 'gid://shopify/Product/8302842740871';
-          }
-        );
-        
-        console.log('Found protection line to remove:', currentProtectionLine);
-        
-        if (currentProtectionLine) {
-          console.log('Removing line ID:', currentProtectionLine.id);
+        if (protectionLine) {
+          console.log('Removing line ID:', protectionLine.id);
+          console.log('Line quantity:', protectionLine.quantity);
           
           const removeResult = await applyCartLinesChange({
             type: 'removeCartLine',
-            id: currentProtectionLine.id,
-            quantity: currentProtectionLine.quantity,
+            id: protectionLine.id,
+            quantity: parseInt(protectionLine.quantity, 10),
           });
           
           console.log('Remove result:', removeResult);
           
-          await applyAttributeChange({
-            type: 'updateAttribute',
-            key: '_protection_enabled',
-            value: 'false',
-          });
-          
-          console.log('✅ Protection removed successfully!');
+          if (removeResult.type === 'success') {
+            await applyAttributeChange({
+              type: 'updateAttribute',
+              key: '_protection_enabled',
+              value: 'false',
+            });
+            console.log('✅ Protection removed successfully!');
+          } else {
+            console.error('❌ Failed to remove protection:', removeResult);
+            setIsChecked(true); // Revert checkbox
+          }
         } else {
-          console.log('❌ No protection line found in cart');
-          console.log('All cart line details:',cartLines.map(l => ({
+          console.log('❌ No protection line found in cart to remove');
+          console.log('All cart lines:', cartLines.map(l => ({
             id: l.id,
             handle: l.merchandise?.product?.handle,
             title: l.merchandise?.product?.title,
-            productId: l.merchandise?.product?.id,
-            fullMerchandise: l.merchandise
+            productId: l.merchandise?.product?.id
           })));
+          setIsChecked(false); // Keep it unchecked since there's nothing to remove
         }
       }
     } catch (error) {

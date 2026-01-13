@@ -109,7 +109,8 @@ export const action = async ({ request }) => {
             input: {
               id: variantId,
               price: "0.00",
-              taxable: false
+              taxable: false,
+              inventoryPolicy: "CONTINUE"
             }
           }
         }
