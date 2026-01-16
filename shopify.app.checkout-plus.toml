@@ -1,0 +1,19 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "f5a8da3c646eb33833a953bad95d7208"
+name = "checkout-plus"
+application_url = "https://shopify-post-purchases.vercel.app"
+embedded = true
+
+[webhooks]
+api_version = "2026-04"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_orders,write_customers,write_discounts,write_price_rules,write_products"
+
+[auth]
+redirect_urls = [ "https://shopify-post-purchases.vercel.app/api/auth" ]
+
+[build]
+automatically_update_urls_on_dev = true

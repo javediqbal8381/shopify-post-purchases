@@ -1,0 +1,12 @@
+api_version = "2025-01"
+
+[[extensions]]
+uid = "e0511608-ac15-d89c-7ff7-dcc39af22ff059dbb686"
+type = "theme"
+name = "Cart Checkout Plus"
+handle = "cart-checkout-plus"
+
+[extensions.settings]
+[[extensions.settings.blocks]]
+type = "checkout_plus_cart"
+name = "Checkout+ (Cart)"
