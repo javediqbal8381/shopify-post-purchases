@@ -7,10 +7,18 @@ import { CASHBACK_CONFIG } from "../config";
 export const action = async ({ request }) => {
   console.log('🔔 Webhook received: orders/create');
   
+  // #region agent log
+  const debugLog = (loc, msg, data, hyp) => fetch('http://127.0.0.1:7242/ingest/b9111116-a737-47d1-9fc6-489a44e45604',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:loc,message:msg,data,timestamp:Date.now(),sessionId:'debug-session',hypothesisId:hyp})}).catch(()=>{});
+  // #endregion
+  
   try {
     // Read the body first to get order data
     const bodyText = await request.clone().text();
     const order = JSON.parse(bodyText);
+    
+    // #region agent log
+    debugLog('webhooks.orders.create.jsx:14', 'Webhook entry', {orderName: order.name, email: order.email, hasCustomer: !!order.customer}, 'A,B,E');
+    // #endregion
     
     // Try to authenticate, but fallback if it fails
     let admin, session;
@@ -19,8 +27,14 @@ export const action = async ({ request }) => {
       const authResult = await authenticate.webhook(request);
       admin = authResult.admin;
       session = authResult.session;
+      // #region agent log
+      debugLog('webhooks.orders.create.jsx:25', 'Auth success - primary', {hasAdmin: !!admin, hasSession: !!session, shop: session?.shop}, 'B');
+      // #endregion
     } catch (authError) {
       console.warn('⚠️  Using fallback authentication for development');
+      // #region agent log
+      debugLog('webhooks.orders.create.jsx:35', 'Auth fallback triggered', {authError: authError.message, shopDomain: order.shop_domain}, 'B');
+      // #endregion
       
       // Fallback: create admin client manually using stored session
       const shopDomain = order.shop_domain || 'checkout-plus-dev-store-2.myshopify.com';
@@ -31,6 +45,10 @@ export const action = async ({ request }) => {
       if (!activeSession) {
         throw new Error('No active session found - app may not be installed');
       }
+      
+      // #region agent log
+      debugLog('webhooks.orders.create.jsx:48', 'Fallback auth found session', {sessionShop: activeSession.shop, hasToken: !!activeSession.accessToken}, 'B');
+      // #endregion
       
       session = activeSession;
       admin = {
@@ -88,12 +106,22 @@ export const action = async ({ request }) => {
           add: [`gid://shopify/Customer/${order.customer.id}`]
         }
       };
+      // #region agent log
+      debugLog('webhooks.orders.create.jsx:89', 'Context: customer-specific', {customerId: order.customer.id, contextType: 'customers'}, 'A,E');
+      // #endregion
     } else {
       // For guest checkout, make it available to all customers
       context = {
         all: "ALL"
       };
+      // #region agent log
+      debugLog('webhooks.orders.create.jsx:98', 'Context: all customers', {contextType: 'all'}, 'A');
+      // #endregion
     }
+    
+    // #region agent log
+    debugLog('webhooks.orders.create.jsx:103', 'Before discount mutation', {code: discountCode, amount: cashbackAmount, startsAt, endsAt, context: JSON.stringify(context)}, 'A,D');
+    // #endregion
     
     const discountResponse = await admin.graphql(
       `#graphql
@@ -148,10 +176,18 @@ export const action = async ({ request }) => {
     
     const discountData = await discountResponse.json();
     
+    // #region agent log
+    debugLog('webhooks.orders.create.jsx:151', 'Discount response received', {hasData: !!discountData.data, hasErrors: !!(discountData.errors), responseKeys: Object.keys(discountData)}, 'A,C');
+    // #endregion
+    
     // Log full response for debugging
     console.log('📋 Discount creation response:', JSON.stringify(discountData, null, 2));
     
     const userErrors = discountData.data?.discountCodeBasicCreate?.userErrors || [];
+    
+    // #region agent log
+    debugLog('webhooks.orders.create.jsx:160', 'User errors check', {errorCount: userErrors.length, errors: userErrors}, 'A,C');
+    // #endregion
     
     if (userErrors.length > 0) {
       console.error('❌ Discount creation errors:', userErrors);
@@ -163,6 +199,10 @@ export const action = async ({ request }) => {
     const actualCode = createdDiscount?.codes?.nodes?.[0]?.code || discountCode;
     const discountStatus = createdDiscount?.status;
     const discountId = discountData.data?.discountCodeBasicCreate?.codeDiscountNode?.id;
+    
+    // #region agent log
+    debugLog('webhooks.orders.create.jsx:178', 'Discount extracted from response', {hasDiscount: !!createdDiscount, actualCode, discountStatus, discountId, codesArray: createdDiscount?.codes?.nodes}, 'C,D');
+    // #endregion
     
     if (!discountId) {
       throw new Error('Discount was created but no ID was returned');
@@ -216,11 +256,20 @@ export const action = async ({ request }) => {
     });
     
     console.log(`✅ Cashback processed: ${finalDiscountCode} for $${cashbackAmount}`);
+    
+    // #region agent log
+    debugLog('webhooks.orders.create.jsx:230', 'Webhook completed successfully', {finalCode: finalDiscountCode, cashback: cashbackAmount, emailSent: true}, 'ALL');
+    // #endregion
+    
     return new Response('OK', { status: 200 });
     
   } catch (error) {
     console.error('❌ Webhook error:', error.message || error);
     if (error.stack) console.error(error.stack);
+    
+    // #region agent log
+    debugLog('webhooks.orders.create.jsx:238', 'Webhook error caught', {errorMessage: error.message, errorStack: error.stack?.substring(0, 200)}, 'ALL');
+    // #endregion
     
     // Return 200 so Shopify doesn't retry
     return new Response(JSON.stringify({ 
