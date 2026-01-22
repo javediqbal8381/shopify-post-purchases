@@ -23,7 +23,7 @@ export const action = async ({ request }) => {
       console.warn('⚠️  Using fallback authentication for development');
       
       // Fallback: create admin client manually using stored session
-      const shopDomain = order.shop_domain || 'dev-cloths-store.myshopify.com';
+      const shopDomain = order.shop_domain || 'checkout-plus-dev-store-2.myshopify.com';
       const shopifyServer = await import("../shopify.server");
       const sessions = await shopifyServer.sessionStorage.findSessionsByShop(shopDomain);
       const activeSession = sessions.find(s => s.isOnline === false) || sessions[0];

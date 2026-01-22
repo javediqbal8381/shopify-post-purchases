@@ -53,7 +53,7 @@ npm run dev
 
 ## ✅ Testing
 
-1. Go to your store: `dev-cloths-store.myshopify.com`
+1. Go to your store: `checkout-plus-dev-store-2.myshopify.com`
 2. Add product to cart
 3. Go to **Checkout** (not cart!)
 4. You'll see:
