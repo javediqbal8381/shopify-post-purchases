@@ -1,0 +1,624 @@
+{% comment %}
+  Checkout+ App Embed
+  Automatically injects into cart drawer and cart page
+{% endcomment %}
+
+<script>
+(function() {
+  'use strict';
+  
+  const CASHBACK_PERCENT = 5;
+  const INSURANCE_PERCENT = 4;
+  const PROTECTION_HANDLE = 'order-protection';
+  const EMBED_ID = 'checkout-plus-embed-' + Date.now();
+  
+  // Prevent duplicate injection
+  if (window.checkoutPlusEmbedLoaded) {
+    return;
+  }
+  window.checkoutPlusEmbedLoaded = true;
+  
+  // Store original fetch before any modifications (needed for checkbox handler)
+  const originalFetch = window.fetch;
+  
+  // Common cart drawer selectors (works with most themes)
+  const CART_DRAWER_SELECTORS = [
+    '[id*="cart-drawer"]',
+    '[id*="CartDrawer"]',
+    '[class*="cart-drawer"]',
+    '[class*="CartDrawer"]',
+    '[id*="drawer-cart"]',
+    '[class*="drawer-cart"]',
+    'cart-drawer',
+    'cart-notification',
+    '[id*="mini-cart"]',
+    '[class*="mini-cart"]'
+  ];
+  
+  // Common cart page selectors
+  const CART_PAGE_SELECTORS = [
+    'form[action*="/cart"]',
+    '[id*="cart"]',
+    'main-cart-items',
+    'cart-items',
+    '.cart'
+  ];
+  
+  // Common cart footer/actions selectors (where checkout button lives)
+  const CART_FOOTER_SELECTORS = [
+    'cart-footer',
+    'cart-actions',
+    '.cart-footer',
+    '.cart-actions',
+    '[class*="cart-footer"]',
+    '[class*="cart-actions"]',
+    '.cart__footer',
+    '.cart__actions',
+    '[class*="subtotal"]',
+    '.cart__ctas',
+    '[data-cart-footer]'
+  ];
+  
+  let injectedInstances = new Set();
+  
+  // Create the UI component
+  function createCheckoutPlusUI() {
+    const container = document.createElement('div');
+    container.className = 'checkout-plus-embed';
+    container.id = EMBED_ID;
+    container.setAttribute('data-cart-total', '0');
+    container.setAttribute('data-protection-handle', PROTECTION_HANDLE);
+    
+    container.innerHTML = `
+      <style>
+        /* Hide Order Protection product row in cart */
+        tr.cart-item:has(a[href*="/products/order-protection"]) {
+          display: none !important;
+        }
+        
+        .checkout-plus-embed {
+          margin: 16px 0;
+        }
+        
+        .checkout-plus-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+        }
+        
+        .checkout-plus-title {
+          font-weight: 400;
+          font-size: 14px;
+          margin: 0;
+          color: #000;
+        }
+        
+        .checkout-plus-fee {
+          font-size: 14px;
+          font-weight: 400;
+          color: #000;
+        }
+        
+        .checkout-plus-description {
+          font-size: 13px;
+          color: #666;
+          margin: 0 0 16px 0;
+          line-height: 1.4;
+        }
+        
+        .checkout-plus-btn-primary {
+          width: 100%;
+          padding: 18px;
+          border: none;
+          border-radius: 4px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: opacity 0.2s;
+          text-transform: uppercase;
+          background: #c47a52;
+          color: white;
+          margin-bottom: 16px;
+        }
+        
+        .checkout-plus-btn-primary:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        
+        .checkout-plus-btn-primary:hover:not(:disabled) {
+          opacity: 0.9;
+        }
+        
+        .checkout-plus-embed:not([data-injected]) {
+          display: none;
+        }
+      </style>
+      
+      <div class="checkout-plus-header">
+        <span class="checkout-plus-title">Kinfield Checkout+</span>
+        <span class="checkout-plus-fee">$<span class="checkout-plus-price">0.00</span></span>
+      </div>
+      
+      <p class="checkout-plus-description">
+        Get Free Returns, $<span class="checkout-plus-cashback">0.00</span> CashBack, Delivery Protection, and a 30-day Guarantee.
+      </p>
+      
+      <button 
+        class="checkout-plus-btn-primary" 
+        id="checkout-plus-with-protection-${EMBED_ID}"
+      >
+        CHECKOUT+ | <span class="checkout-plus-total">$0.00</span>
+      </button>
+    `;
+    
+    return container;
+  }
+  
+  // Find cart container (drawer or page)
+  function findCartContainer() {
+    // Check for cart drawer first
+    for (const selector of CART_DRAWER_SELECTORS) {
+      const drawer = document.querySelector(selector);
+      if (drawer && (drawer.offsetParent !== null || drawer.style.display !== 'none')) {
+        return { container: drawer, type: 'drawer' };
+      }
+    }
+    
+    // Check for cart page
+    if (window.location.pathname === '/cart' || window.location.pathname.includes('/cart')) {
+      for (const selector of CART_PAGE_SELECTORS) {
+        const page = document.querySelector(selector);
+        if (page) {
+          return { container: page, type: 'page' };
+        }
+      }
+    }
+    
+    return null;
+  }
+  
+  // Find insertion point in cart
+  function findInsertionPoint(cartContainer) {
+    // Try cart footer first (best UX)
+    for (const selector of CART_FOOTER_SELECTORS) {
+      const footer = cartContainer.querySelector(selector);
+      if (footer) {
+        return footer;
+      }
+    }
+    
+    // Try to find cart items container and insert before footer
+    const itemsContainer = cartContainer.querySelector('[class*="cart-items"], [id*="cart-items"], main-cart-items, cart-items');
+    if (itemsContainer && itemsContainer.parentElement) {
+      return itemsContainer.parentElement;
+    }
+    
+    // Fallback: insert at end of cart container
+    return cartContainer;
+  }
+  
+  // Inject UI into cart
+  function injectUI() {
+    const cartInfo = findCartContainer();
+    if (!cartInfo) {
+      return false;
+    }
+    
+    const { container, type } = cartInfo;
+    const instanceId = `${type}-${container.id || container.className}`;
+    
+    // Prevent duplicate injection
+    if (injectedInstances.has(instanceId)) {
+      return true;
+    }
+    
+    // Check if already injected in this container
+    const existingEmbed = container.querySelector('.checkout-plus-embed');
+    if (existingEmbed) {
+      injectedInstances.add(instanceId);
+      return true;
+    }
+    
+    const insertionPoint = findInsertionPoint(container);
+    if (!insertionPoint) {
+      return false;
+    }
+    
+    const ui = createCheckoutPlusUI();
+    ui.setAttribute('data-injected', 'true');
+    
+    // Find the cart-drawer__footer section (where subtotal and taxes text live)
+    const drawerFooter = container.querySelector('.cart-drawer__footer');
+    const cartCtas = container.querySelector('.cart__ctas');
+    
+    if (drawerFooter && cartCtas) {
+      // Insert right before the cart__ctas section (after subtotal, before buttons)
+      cartCtas.insertAdjacentElement('beforebegin', ui);
+    } else if (drawerFooter) {
+      // Insert at end of drawer footer
+      drawerFooter.appendChild(ui);
+    } else {
+      // Fallback: use the original insertion point
+      insertionPoint.appendChild(ui);
+    }
+    
+    injectedInstances.add(instanceId);
+    initializeUI(ui);
+    
+    return true;
+  }
+  
+  // Initialize UI functionality
+  function initializeUI(container) {
+    const checkoutWithBtn = container.querySelector(`#checkout-plus-with-protection-${EMBED_ID}`);
+    const totalSpan = container.querySelector('.checkout-plus-total');
+    const priceSpan = container.querySelector('.checkout-plus-price');
+    const cashbackSpan = container.querySelector('.checkout-plus-cashback');
+    
+    if (!checkoutWithBtn || !totalSpan || !cashbackSpan || !priceSpan) {
+      return;
+    }
+    
+    // Find and modify the default checkout button text and behavior
+    const defaultCheckoutBtn = document.querySelector('[name="checkout"], button[type="submit"], .cart__checkout-button, [class*="checkout-button"]');
+    if (defaultCheckoutBtn) {
+      // Change button text
+      defaultCheckoutBtn.textContent = 'Continue Without Checkout+';
+      
+      // Override click to remove protection first
+      defaultCheckoutBtn.addEventListener('click', async function(e) {
+        e.preventDefault();
+        
+        try {
+          // Remove protection if it exists
+          const cartRes = await originalFetch('/cart.js');
+          const cart = await cartRes.json();
+          const protectionItem = cart.items.find(item => item.handle === PROTECTION_HANDLE);
+          
+          if (protectionItem) {
+            await originalFetch('/cart/change.js', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: protectionItem.key, quantity: 0 }),
+            });
+          }
+        } catch (err) {
+          console.error('Failed to remove protection:', err);
+        }
+        
+        // Go to checkout
+        window.location.href = '/checkout';
+      }, { once: false });
+    }
+    
+    // Calculate prices based on current cart
+    function updatePrices() {
+      fetch('/cart.js')
+        .then(res => res.json())
+        .then(cart => {
+          // Calculate total excluding protection product
+          let cartTotal = 0;
+          let protectionVariantId = null;
+          
+          cart.items.forEach(item => {
+            if (item.handle !== PROTECTION_HANDLE) {
+              cartTotal += item.final_line_price;
+            } else {
+              protectionVariantId = item.variant_id;
+            }
+          });
+          
+          // Convert from cents to dollars
+          cartTotal = cartTotal / 100;
+          
+          const insuranceFee = (cartTotal * INSURANCE_PERCENT / 100).toFixed(2);
+          const cashbackAmount = (cartTotal * CASHBACK_PERCENT / 100).toFixed(2);
+          const totalWithProtection = (cartTotal + parseFloat(insuranceFee)).toFixed(2);
+          
+          priceSpan.textContent = insuranceFee;
+          totalSpan.textContent = '$' + totalWithProtection;
+          cashbackSpan.textContent = cashbackAmount;
+          
+          // Show/hide based on cart total
+          if (cartTotal > 0) {
+            container.style.display = 'block';
+          } else {
+            container.style.display = 'none';
+          }
+        })
+        .catch(err => {
+          console.error('Failed to fetch cart:', err);
+        });
+    }
+    
+    // Initial price calculation
+    updatePrices();
+    
+    // Handle "CHECKOUT+" button click
+    let isProcessing = false;
+    checkoutWithBtn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      
+      if (isProcessing) return;
+      
+      isProcessing = true;
+      checkoutWithBtn.disabled = true;
+      checkoutWithBtn.textContent = 'Adding Protection...';
+      
+      try {
+        // First, check if protection product is already in cart
+        const cartCheckResponse = await originalFetch('/cart.js');
+        const currentCart = await cartCheckResponse.json();
+        const alreadyHasProtection = currentCart.items.some(item => item.handle === PROTECTION_HANDLE);
+        
+        if (!alreadyHasProtection) {
+          // Protection not in cart, add it
+          const response = await originalFetch(`/products/${PROTECTION_HANDLE}.js`);
+          if (!response.ok) {
+            throw new Error('Product not found');
+          }
+          
+          const product = await response.json();
+          
+          if (!product || !product.variants || product.variants.length === 0) {
+            throw new Error('Protection product not available');
+          }
+          
+          const variantId = product.variants[0].id;
+          
+          // Add to cart using AJAX API
+          const addResponse = await originalFetch('/cart/add.js', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              id: variantId,
+              quantity: 1,
+            }),
+          });
+          
+          if (!addResponse.ok) {
+            const errorData = await addResponse.json().catch(() => ({}));
+            throw new Error(errorData.description || 'Failed to add to cart');
+          }
+          
+          const addResult = await addResponse.json();
+          if (addResult.errors && Object.keys(addResult.errors).length > 0) {
+            throw new Error(Object.values(addResult.errors)[0]);
+          }
+          
+          console.log('✅ Protection added to cart');
+        } else {
+          console.log('✅ Protection already in cart, proceeding to checkout');
+        }
+        
+        // Go to checkout
+        window.location.href = '/checkout';
+        
+      } catch (error) {
+        console.error('❌ Failed to add protection:', error);
+        checkoutWithBtn.disabled = false;
+        const currentTotal = totalSpan.textContent;
+        checkoutWithBtn.innerHTML = 'CHECKOUT+ | <span class="checkout-plus-total">' + currentTotal + '</span>';
+      }
+    });
+    
+    // Listen for cart updates
+    document.addEventListener('cart:updated', updatePrices);
+    document.addEventListener('cart:refresh', updatePrices);
+    window.addEventListener('cart:updated', updatePrices);
+    window.addEventListener('cart:refresh', updatePrices);
+  }
+  
+  // MutationObserver to detect cart drawer opening
+  // But don't interfere if UI already exists
+  let observerTimeout;
+  const observer = new MutationObserver((mutations) => {
+    // Debounce observer calls
+    clearTimeout(observerTimeout);
+    observerTimeout = setTimeout(() => {
+      let shouldInject = false;
+      
+      // Check if UI already exists
+      const existingUI = document.querySelector('.checkout-plus-embed');
+      if (existingUI && existingUI.isConnected) {
+        return; // UI exists, don't re-inject
+      }
+      
+      mutations.forEach((mutation) => {
+        // Check if cart drawer was opened
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === 1) { // Element node
+            // Check if this is a cart drawer
+            for (const selector of CART_DRAWER_SELECTORS) {
+              if (node.matches && node.matches(selector)) {
+                shouldInject = true;
+              }
+              if (node.querySelector && node.querySelector(selector)) {
+                shouldInject = true;
+              }
+            }
+            
+            // Check if cart drawer became visible
+            if (node.classList) {
+              const hasCartClass = Array.from(node.classList).some(cls => 
+                cls.toLowerCase().includes('cart') && 
+                (cls.toLowerCase().includes('drawer') || cls.toLowerCase().includes('open'))
+              );
+              if (hasCartClass) {
+                shouldInject = true;
+              }
+            }
+          }
+        });
+        
+        // Check for attribute changes (drawer opening/closing)
+        if (mutation.type === 'attributes') {
+          const target = mutation.target;
+          if (target && target.classList) {
+            const isCartDrawer = CART_DRAWER_SELECTORS.some(sel => {
+              try {
+                return target.matches(sel) || target.closest(sel);
+              } catch (e) {
+                return false;
+              }
+            });
+            
+            if (isCartDrawer && (mutation.attributeName === 'class' || mutation.attributeName === 'style')) {
+              const isVisible = target.offsetParent !== null && 
+                              target.style.display !== 'none' &&
+                              !target.classList.contains('hidden');
+              if (isVisible) {
+                shouldInject = true;
+              }
+            }
+          }
+        }
+      });
+      
+      if (shouldInject) {
+        setTimeout(() => {
+          injectUI();
+        }, 200);
+      }
+    }, 150);
+  });
+  
+  // Start observing
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style']
+  });
+  
+  // Initial injection attempt
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(injectUI, 500);
+    });
+  } else {
+    setTimeout(injectUI, 500);
+  }
+  
+  // Also try injecting on navigation (for SPA themes)
+  let lastUrl = window.location.href;
+  setInterval(() => {
+    if (window.location.href !== lastUrl) {
+      lastUrl = window.location.href;
+      setTimeout(() => {
+        injectedInstances.clear();
+        injectUI();
+      }, 500);
+    }
+  }, 1000);
+  
+  // Listen for cart AJAX updates (common in modern themes)
+  // Only update prices, don't trigger events to avoid loops
+  // Don't intercept checkout or other critical operations
+  let isUpdating = false;
+  let lastCartUpdate = 0;
+  
+  window.fetch = function(...args) {
+    const url = args[0];
+    
+    // Don't intercept checkout, payment, or other critical operations
+    if (typeof url === 'string') {
+      // Skip checkout-related URLs
+      if (url.includes('/checkout') || 
+          url.includes('/payments') || 
+          url.includes('/orders') ||
+          url.includes('/thank_you')) {
+        return originalFetch.apply(this, args);
+      }
+      
+      // Only handle cart operations
+      if (url.includes('/cart.js') || url.includes('/cart/add') || url.includes('/cart/change')) {
+        return originalFetch.apply(this, args).then(response => {
+          // Debounce updates - only update once per 500ms
+          const now = Date.now();
+          if (now - lastCartUpdate < 500) {
+            return response;
+          }
+          lastCartUpdate = now;
+          
+          // Only update prices if not already updating to prevent loops
+          if (!isUpdating) {
+            isUpdating = true;
+            setTimeout(() => {
+              // Just update prices, don't trigger events
+              // Make sure UI still exists before updating
+              document.querySelectorAll('.checkout-plus-embed').forEach(container => {
+                if (!container.isConnected) return; // Skip if removed from DOM
+                
+                const checkbox = container.querySelector('.checkout-plus-checkbox');
+                const priceSpan = container.querySelector('.checkout-plus-price');
+                const cashbackSpan = container.querySelector('.checkout-plus-cashback');
+                
+                if (checkbox && priceSpan && cashbackSpan) {
+                  // Use original fetch to avoid recursion
+                  originalFetch('/cart.js')
+                    .then(res => {
+                      if (!res.ok) throw new Error('Cart fetch failed');
+                      return res.json();
+                    })
+                    .then(cart => {
+                      let cartTotal = 0;
+                      let protectionVariantId = null;
+                      
+                      cart.items.forEach(item => {
+                        if (item.handle !== PROTECTION_HANDLE) {
+                          cartTotal += item.final_line_price;
+                        } else {
+                          protectionVariantId = item.variant_id;
+                        }
+                      });
+                      
+                      cartTotal = cartTotal / 100;
+                      const insuranceFee = (cartTotal * INSURANCE_PERCENT / 100).toFixed(2);
+                      const cashbackAmount = (cartTotal * CASHBACK_PERCENT / 100).toFixed(2);
+                      
+                      priceSpan.textContent = '$' + insuranceFee;
+                      cashbackSpan.textContent = '$' + cashbackAmount;
+                      checkbox.checked = !!protectionVariantId;
+                    })
+                    .catch(() => {
+                      // Silently fail - don't break cart functionality
+                    })
+                    .finally(() => {
+                      isUpdating = false;
+                    });
+                } else {
+                  isUpdating = false;
+                }
+              });
+              
+              // Re-inject UI if it was removed (cart drawer refresh)
+              setTimeout(() => {
+                if (document.querySelectorAll('.checkout-plus-embed').length === 0) {
+                  injectedInstances.clear();
+                  injectUI();
+                }
+              }, 100);
+            }, 300);
+          }
+          return response;
+        });
+      }
+    }
+    return originalFetch.apply(this, args);
+  };
+  
+})();
+</script>
+
+{% schema %}
+{
+  "name": "Checkout+ (Auto-inject)",
+  "target": "body",
+  "settings": []
+}
+{% endschema %}

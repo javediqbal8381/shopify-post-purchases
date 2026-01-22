@@ -80,17 +80,18 @@ export const action = async ({ request }) => {
     const startsAt = new Date().toISOString();
     const endsAt = new Date(Date.now() + CASHBACK_CONFIG.CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
     
-    // Build customer selection
-    let customerSelection = {};
+    // Build context (replaces deprecated customerSelection)
+    let context = {};
     if (hasCustomer) {
-      customerSelection = {
+      context = {
         customers: {
           add: [`gid://shopify/Customer/${order.customer.id}`]
         }
       };
     } else {
-      customerSelection = {
-        all: true
+      // For guest checkout, make it available to all customers
+      context = {
+        all: "ALL"
       };
     }
     
@@ -103,6 +104,7 @@ export const action = async ({ request }) => {
             codeDiscount {
               ... on DiscountCodeBasic {
                 title
+                status
                 codes(first: 1) {
                   nodes {
                     code
@@ -114,6 +116,7 @@ export const action = async ({ request }) => {
           userErrors {
             field
             message
+            code
           }
         }
       }`,
@@ -124,7 +127,7 @@ export const action = async ({ request }) => {
             code: discountCode,
             startsAt,
             endsAt,
-            customerSelection,
+            context,
             customerGets: {
               value: {
                 discountAmount: {
@@ -136,20 +139,41 @@ export const action = async ({ request }) => {
                 all: true
               }
             },
-            usageLimit: 1
+            usageLimit: 1,
+            appliesOncePerCustomer: true
           }
         }
       }
     );
     
     const discountData = await discountResponse.json();
+    
+    // Log full response for debugging
+    console.log('📋 Discount creation response:', JSON.stringify(discountData, null, 2));
+    
     const userErrors = discountData.data?.discountCodeBasicCreate?.userErrors || [];
     
     if (userErrors.length > 0) {
+      console.error('❌ Discount creation errors:', userErrors);
       throw new Error(`Failed to create discount code: ${JSON.stringify(userErrors)}`);
     }
     
-    console.log(`✅ Discount code created: ${discountCode}`);
+    // Get the actual code from the response (in case Shopify modified it)
+    const createdDiscount = discountData.data?.discountCodeBasicCreate?.codeDiscountNode?.codeDiscount;
+    const actualCode = createdDiscount?.codes?.nodes?.[0]?.code || discountCode;
+    const discountStatus = createdDiscount?.status;
+    const discountId = discountData.data?.discountCodeBasicCreate?.codeDiscountNode?.id;
+    
+    if (!discountId) {
+      throw new Error('Discount was created but no ID was returned');
+    }
+    
+    console.log(`✅ Discount code created: ${actualCode}`);
+    console.log(`📊 Discount status: ${discountStatus}`);
+    console.log(`🆔 Discount ID: ${discountId}`);
+    
+    // Use the actual code from Shopify response
+    const finalDiscountCode = actualCode;
     
     // Tag customer as VIP (only if customer exists, not guest checkout)
     if (hasCustomer) {
@@ -185,13 +209,13 @@ export const action = async ({ request }) => {
     await sendCashbackEmail({
       email: order.email,
       customerName: order.customer?.first_name || 'Valued Customer',
-      discountCode,
+      discountCode: finalDiscountCode,
       cashbackAmount,
       orderNumber: order.name,
       shopDomain
     });
     
-    console.log(`✅ Cashback processed: ${discountCode} for $${cashbackAmount}`);
+    console.log(`✅ Cashback processed: ${finalDiscountCode} for $${cashbackAmount}`);
     return new Response('OK', { status: 200 });
     
   } catch (error) {

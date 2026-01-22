@@ -257,11 +257,22 @@ export default function Index() {
         <h2 style={{ fontSize: "20px", marginBottom: "16px" }}>Setup Instructions</h2>
         <ol style={{ lineHeight: "1.8", paddingLeft: "20px" }}>
           <li><strong>Create Protection Product</strong> - Click the button above (if not already created)</li>
-          <li><strong>Enable Theme Extension</strong> - Go to your theme editor and add the "Cashback Upsell" block to your cart page</li>
-          <li><strong>Add Variant ID</strong> - Copy the Variant ID from above and paste it in the block settings</li>
-          <li><strong>Test</strong> - Add items to cart and check the box to test the upsell</li>
+          <li><strong>Enable Cart Drawer Extension</strong> - Follow these steps:
+            <ul style={{ marginTop: "8px", paddingLeft: "20px", lineHeight: "1.6" }}>
+              <li>Go to <strong>Online Store → Themes</strong> in Shopify Admin</li>
+              <li>Click <strong>Customize</strong> on your active theme</li>
+              <li>In the theme customizer, look for <strong>"App embeds"</strong> in the left sidebar (or click "..." menu)</li>
+              <li>Find <strong>"Checkout+ (Auto-inject)"</strong> and toggle it <strong>ON</strong></li>
+              <li>Click <strong>Save</strong></li>
+            </ul>
+          </li>
+          <li><strong>Test</strong> - Add items to cart and open cart drawer - the Checkout+ checkbox should appear automatically</li>
           <li><strong>Email Setup</strong> - Configure your email service (SendGrid/Resend) in the webhook handler</li>
         </ol>
+        
+        <div style={{ marginTop: "16px", padding: "12px", background: "#e3f2fd", borderRadius: "8px", borderLeft: "4px solid #2196f3" }}>
+          <strong>💡 Tip:</strong> If you can't find "App embeds", make sure you've deployed the extension first using <code>shopify app deploy</code>
+        </div>
         
         <div style={{ marginTop: "20px", padding: "16px", background: "#fff3cd", borderRadius: "8px", borderLeft: "4px solid #ffc107" }}>
           <strong>⚠️ Important:</strong>

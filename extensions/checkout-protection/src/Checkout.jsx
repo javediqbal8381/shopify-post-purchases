@@ -7,7 +7,7 @@ import {
   useApplyCartLinesChange,
   useApplyAttributeChange,
   useApi,
-  useTotalAmount,
+  useAttributes,
 } from '@shopify/ui-extensions-react/checkout';
 import { useState, useEffect } from 'react';
 
@@ -18,17 +18,16 @@ function CheckoutProtection() {
   const cartLines = useCartLines();
   const applyCartLinesChange = useApplyCartLinesChange();
   const applyAttributeChange = useApplyAttributeChange();
+  const attributes = useAttributes();
   
   const CASHBACK_PERCENT = 5;
   const INSURANCE_PERCENT = 4;
   const PROTECTION_HANDLE = 'order-protection';
   
-  // Store the protection variant ID dynamically
   const [protectionVariantId, setProtectionVariantId] = useState(null);
   
   // Calculate cart total (excluding protection)
   const cartTotal = cartLines.reduce((total, line) => {
-    // Skip protection product by checking merchandise ID
     if (protectionVariantId && line.merchandise.id === protectionVariantId) {
       return total;
     }
@@ -38,38 +37,42 @@ function CheckoutProtection() {
   const insuranceFee = (cartTotal * INSURANCE_PERCENT / 100).toFixed(2);
   const cashbackAmount = (cartTotal * CASHBACK_PERCENT / 100).toFixed(2);
   
-  // Check if protection is in cart by merchandise ID
-  const protectionLine = cartLines.find(
-    line => protectionVariantId && line.merchandise.id === protectionVariantId
-  );
+  // Check if protection is in cart by variant title (most reliable)
+  const protectionLine = cartLines.find(line => {
+    if (protectionVariantId && line.merchandise.id === protectionVariantId) {
+      return true;
+    }
+    const variantTitle = line.merchandise?.title?.toLowerCase() || '';
+    if (variantTitle.includes('order protection') || variantTitle === 'order protection') {
+      return true;
+    }
+    if (line.merchandise?.product?.handle === PROTECTION_HANDLE) {
+      return true;
+    }
+    const productTitle = line.merchandise?.product?.title?.toLowerCase() || '';
+    if (productTitle.includes('order protection') || productTitle.includes('protection')) {
+      return true;
+    }
+    return false;
+  });
   
-  console.log('🔍 Checking cart lines:');
-  console.log('  Protection variant ID:', protectionVariantId);
-  console.log('  Cart merchandise IDs:', cartLines.map(l => l.merchandise.id));
-  console.log('  Protection line found:', !!protectionLine);
-  
-  const [isChecked, setIsChecked] = useState(!!protectionLine);
+  const protectionEnabled = attributes.find(attr => attr.key === '_protection_enabled')?.value === 'true';
+  const [isChecked, setIsChecked] = useState(false);
   
   useEffect(() => {
-    const hasProtection = !!protectionLine;
-    console.log('useEffect - Has protection:', hasProtection);
+    const hasProtection = protectionEnabled || !!protectionLine;
     setIsChecked(hasProtection);
     
-    // If protection is found and we don't have the variant ID yet, store it
     if (protectionLine && !protectionVariantId) {
       setProtectionVariantId(protectionLine.merchandise.id);
-      console.log('Stored protection variant ID from cart:', protectionLine.merchandise.id);
     }
-  }, [protectionLine, protectionVariantId]);
+  }, [protectionEnabled, protectionLine, protectionVariantId]);
   
   const handleToggle = async (checked) => {
-    console.log('Checkbox toggled:', checked);
     setIsChecked(checked);
     
     try {
       if (checked) {
-        // Get protection product variant ID
-        console.log('Querying for protection product...');
         const result = await query(
           `query {
             products(first: 50) {
@@ -88,15 +91,7 @@ function CheckoutProtection() {
           }`
         );
         
-        console.log('Query result:', JSON.stringify(result, null, 2));
-        
-        // Try multiple ways to find the product
         const allProducts = result?.data?.products?.nodes || [];
-        console.log('Total products found:', allProducts.length);
-        console.log('All product handles:', allProducts.map(p => p.handle));
-        console.log('All product titles:', allProducts.map(p => p.title));
-        
-        // Find by handle or tags
         const product = allProducts.find(p => 
           p.handle === 'order-protection' || 
           p.title.toLowerCase().includes('protection') ||
@@ -105,32 +100,19 @@ function CheckoutProtection() {
         
         const variantId = product?.variants?.nodes?.[0]?.id;
         
-        console.log('Found product:', product);
-        console.log('Variant ID:', variantId);
-        
         if (!variantId) {
-          console.error('❌ Protection product not found. Please create it in Products with handle "order-protection"');
           setIsChecked(false);
           return;
         }
         
-        // Store the variant ID for future reference
         setProtectionVariantId(variantId);
         
-        console.log('Adding product to cart with variant ID:', variantId);
-        
-        // Add protection product
-        const addResult = await applyCartLinesChange({
+        await applyCartLinesChange({
           type: 'addCartLine',
           merchandiseId: variantId,
           quantity: 1,
         });
         
-        console.log('Add cart line result:', addResult);
-        
-        console.log('Product added, setting attributes...');
-        
-        // Save metadata as cart attributes
         await applyAttributeChange({
           type: 'updateAttribute',
           key: '_protection_enabled',
@@ -146,25 +128,13 @@ function CheckoutProtection() {
           key: '_insurance_fee',
           value: insuranceFee,
         });
-        
-        console.log('✅ Protection added successfully!');
       } else {
-        // Remove protection
-        console.log('=== REMOVING PROTECTION ===');
-        console.log('Current cart lines:', cartLines.length);
-        console.log('Protection line to remove:', protectionLine);
-        
         if (protectionLine) {
-          console.log('Removing line ID:', protectionLine.id);
-          console.log('Line quantity:', protectionLine.quantity);
-          
           const removeResult = await applyCartLinesChange({
             type: 'removeCartLine',
             id: protectionLine.id,
             quantity: parseInt(protectionLine.quantity, 10),
           });
-          
-          console.log('Remove result:', removeResult);
           
           if (removeResult.type === 'success') {
             await applyAttributeChange({
@@ -172,28 +142,15 @@ function CheckoutProtection() {
               key: '_protection_enabled',
               value: 'false',
             });
-            console.log('✅ Protection removed successfully!');
           } else {
-            console.error('❌ Failed to remove protection:', removeResult);
-            setIsChecked(true); // Revert checkbox
+            setIsChecked(true);
           }
         } else {
-          console.log('❌ No protection line found in cart to remove');
-          console.log('All cart lines:', cartLines.map(l => ({
-            id: l.id,
-            handle: l.merchandise?.product?.handle,
-            title: l.merchandise?.product?.title,
-            productId: l.merchandise?.product?.id
-          })));
-          setIsChecked(false); // Keep it unchecked since there's nothing to remove
+          setIsChecked(false);
         }
       }
     } catch (error) {
-      console.error('❌ Failed to toggle protection:', error);
-      console.error('Error type:', error.constructor.name);
-      console.error('Error message:', error.message);
-      if (error.stack) console.error('Stack:', error.stack);
-      setIsChecked(!checked); // Revert on error
+      setIsChecked(!checked);
     }
   };
   
@@ -217,4 +174,3 @@ function CheckoutProtection() {
     </BlockStack>
   );
 }
-

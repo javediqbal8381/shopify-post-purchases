@@ -1,0 +1,209 @@
+{% comment %}
+  Checkout+ Cart Block
+  Auto-injects into cart drawer or page
+{% endcomment %}
+
+<script src="{{ 'cart-checkout-plus.js' | asset_url }}" defer></script>
+
+<div class="checkout-plus-cart-block" data-cart-total="{{ cart.total_price | money_without_currency }}" data-protection-handle="order-protection">
+  <style>
+    .checkout-plus-cart-block {
+      padding: 16px;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      margin: 12px 0;
+      background: #f9f9f9;
+    }
+    
+    .checkout-plus-checkbox-wrapper {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      cursor: pointer;
+    }
+    
+    .checkout-plus-checkbox {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      margin-top: 2px;
+    }
+    
+    .checkout-plus-content {
+      flex: 1;
+    }
+    
+    .checkout-plus-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin: 0 0 4px 0;
+      color: #000;
+    }
+    
+    .checkout-plus-description {
+      font-size: 12px;
+      color: #666;
+      margin: 0;
+    }
+    
+    .checkout-plus-loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  </style>
+  
+  <label class="checkout-plus-checkbox-wrapper">
+    <input 
+      type="checkbox" 
+      class="checkout-plus-checkbox" 
+      id="checkout-plus-toggle"
+      {% if cart.items.size > 0 %}
+        {% for item in cart.items %}
+          {% if item.product.handle == "order-protection" %}
+            checked
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    >
+    <div class="checkout-plus-content">
+      <p class="checkout-plus-title">
+        Checkout+ for <span id="checkout-plus-price">$0.00</span>
+      </p>
+      <p class="checkout-plus-description">
+        Protect your package, earn <span id="checkout-plus-cashback">$0.00</span> cashback, and more.
+      </p>
+    </div>
+  </label>
+</div>
+
+<script>
+(function() {
+  const CASHBACK_PERCENT = 5;
+  const INSURANCE_PERCENT = 4;
+  const PROTECTION_HANDLE = 'order-protection';
+  
+  const block = document.querySelector('.checkout-plus-cart-block');
+  const checkbox = document.getElementById('checkout-plus-toggle');
+  const priceSpan = document.getElementById('checkout-plus-price');
+  const cashbackSpan = document.getElementById('checkout-plus-cashback');
+  
+  // Calculate prices based on current cart
+  function updatePrices() {
+    fetch('/cart.js')
+      .then(res => res.json())
+      .then(cart => {
+        // Calculate total excluding protection product
+        let cartTotal = 0;
+        let protectionVariantId = null;
+        
+        cart.items.forEach(item => {
+          if (item.handle !== PROTECTION_HANDLE) {
+            cartTotal += item.final_line_price;
+          } else {
+            protectionVariantId = item.variant_id;
+          }
+        });
+        
+        // Convert from cents to dollars
+        cartTotal = cartTotal / 100;
+        
+        const insuranceFee = (cartTotal * INSURANCE_PERCENT / 100).toFixed(2);
+        const cashbackAmount = (cartTotal * CASHBACK_PERCENT / 100).toFixed(2);
+        
+        priceSpan.textContent = '$' + insuranceFee;
+        cashbackSpan.textContent = '$' + cashbackAmount;
+        
+        // Update checkbox state
+        checkbox.checked = !!protectionVariantId;
+      });
+  }
+  
+  // Initial price calculation
+  updatePrices();
+  
+  // Handle checkbox toggle
+  checkbox.addEventListener('change', async function() {
+    const isChecked = this.checked;
+    block.classList.add('checkout-plus-loading');
+    
+    try {
+      if (isChecked) {
+        // Add protection product to cart
+        // First, get the product to find variant ID
+        const response = await fetch(`/products/${PROTECTION_HANDLE}.js`);
+        const product = await response.json();
+        
+        if (!product || !product.variants || product.variants.length === 0) {
+          console.error('Protection product not found');
+          alert('Protection product is not available. Please contact support.');
+          checkbox.checked = false;
+          block.classList.remove('checkout-plus-loading');
+          return;
+        }
+        
+        const variantId = product.variants[0].id;
+        
+        // Add to cart using AJAX API
+        await fetch('/cart/add.js', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: variantId,
+            quantity: 1,
+          }),
+        });
+        
+        console.log('✅ Protection added to cart');
+      } else {
+        // Remove protection product from cart
+        const cartResponse = await fetch('/cart.js');
+        const cart = await cartResponse.json();
+        
+        const protectionItem = cart.items.find(item => item.handle === PROTECTION_HANDLE);
+        
+        if (protectionItem) {
+          await fetch('/cart/change.js', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              id: protectionItem.key,
+              quantity: 0,
+            }),
+          });
+          
+          console.log('✅ Protection removed from cart');
+        }
+      }
+      
+      // Refresh cart UI (this triggers theme's cart drawer update)
+      document.dispatchEvent(new CustomEvent('cart:refresh'));
+      
+      // Update prices
+      updatePrices();
+      
+    } catch (error) {
+      console.error('❌ Failed to toggle protection:', error);
+      alert('Failed to update cart. Please try again.');
+      checkbox.checked = !isChecked; // Revert
+    } finally {
+      block.classList.remove('checkout-plus-loading');
+    }
+  });
+  
+  // Listen for cart updates from theme
+  document.addEventListener('cart:updated', updatePrices);
+  document.addEventListener('cart:refresh', updatePrices);
+})();
+</script>
+{% schema %}
+{
+  "name": "Checkout+ (Cart)",
+  "target": "section",
+  "settings": []
+}
+{% endschema %}
+

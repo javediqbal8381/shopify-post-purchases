@@ -1,4 +1,4 @@
-api_version = "2025-01"
+api_version = "2025-04"
 
 [[extensions]]
 uid = "e0511608-ac15-d89c-7ff7-dcc39af22ff059dbb686"
@@ -10,3 +10,7 @@ handle = "cart-checkout-plus"
 [[extensions.settings.blocks]]
 type = "checkout_plus_cart"
 name = "Checkout+ (Cart)"
+
+[[extensions.settings.blocks]]
+type = "checkout_plus_embed"
+name = "Checkout+ (Auto-inject)"
