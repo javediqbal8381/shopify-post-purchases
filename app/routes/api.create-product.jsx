@@ -14,13 +14,13 @@ export const action = async ({ request }) => {
           status: ACTIVE
           vendor: "Store"
           productType: "Service"
-          tags: ["order-protection", "hidden"]
+          tags: ["order-protection", "hidden", "cart-item-hidden"]
         }) {
           product {
             id
             title
             handle
-            variants(first: 1) {
+            variants(first: 1) { 
               nodes {
                 id
               }

@@ -62,10 +62,23 @@ export function cartTransformRun(input) {
   });
 
   // Calculate protection fee (4% of subtotal)
-  const protectionFee = subtotal * (FEE_PERCENTAGE / 100);
+  const protectionFee = subtotal * (FEE_PERCENTAGE / 100); 
 
-  // Use lineExpand as workaround since lineUpdate is not available
-  // This expands the protection line and sets a custom price
+  // Calculate the price adjustment needed
+  // Since we can't use lineUpdate (Shopify Plus only), we use lineExpand
+  // The product should have a base price set, and we adjust it here
+  const currentPrice = parseFloat(protectionLine.cost.amountPerQuantity.amount);
+  const priceAdjustment = protectionFee - currentPrice;
+
+  console.error(`[Cart Transform] Current price: $${currentPrice.toFixed(2)}, Target: $${protectionFee.toFixed(2)}, Adjustment: $${priceAdjustment.toFixed(2)}`);
+
+  // If the price is already correct (within 1 cent), don't adjust
+  if (Math.abs(priceAdjustment) < 0.01) {
+    console.error(`[Cart Transform] Price already correct, no adjustment needed`);
+    return NO_CHANGES;
+  }
+
+  // Use lineExpand to adjust the price
   const expandOperation = {
     lineExpand: {
       cartLineId: protectionLine.id,
@@ -86,7 +99,7 @@ export function cartTransformRun(input) {
   };
 
   console.error(`[Cart Transform] Subtotal: $${subtotal.toFixed(2)}, Protection Fee (4%): $${protectionFee.toFixed(2)}`);
-  console.error(`[Cart Transform] Returning lineExpand operation (workaround for unavailable lineUpdate)`);
+  console.error(`[Cart Transform] Returning lineExpand operation`);
 
   return {
     operations: [expandOperation],
