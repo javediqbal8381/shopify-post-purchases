@@ -338,8 +338,10 @@ async function sendCashbackEmail({ email, customerName, discountCode, cashbackAm
   const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
   // If Resend API key is configured, use Resend
+  console.log(`📧 Attempting to send email to ${email}...`);
   if (RESEND_API_KEY) {
     try {
+      console.log(`📧 Using Resend API with from: ${FROM_EMAIL}`);
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -355,6 +357,7 @@ async function sendCashbackEmail({ email, customerName, discountCode, cashbackAm
       });
 
       const result = await response.json();
+      console.log(`📧 Resend API response status: ${response.status}`, JSON.stringify(result));
 
       if (!response.ok) {
         throw new Error(`Resend API error: ${JSON.stringify(result)}`);
@@ -363,7 +366,7 @@ async function sendCashbackEmail({ email, customerName, discountCode, cashbackAm
       console.log(`✅ Email sent to ${email} - Code: ${discountCode}`);
       return;
     } catch (error) {
-      console.error('Failed to send email:', error.message);
+      console.error('❌ Failed to send email:', error.message);
       // Continue - email failure shouldn't block webhook processing
     }
   }
