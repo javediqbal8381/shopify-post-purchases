@@ -18,7 +18,7 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about checkou++</h1>
+        <h1 className={styles.heading}>A short heading about checkou++ {process.env.DATABASE_URL}</h1>
         <p className={styles.text}>
           A tagline about [your app] that describes your value proposition.
         </p>
