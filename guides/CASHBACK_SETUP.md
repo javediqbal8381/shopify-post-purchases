@@ -56,14 +56,12 @@ npm run dev
 
 ### Step 4: Configure Email Sending (Optional)
 
-Email sending is already configured with Resend. To customize:
+Email sending is configured with Klaviyo. To customize:
 
-1. Get a Resend API key from https://resend.com
-2. Update the API key in `app/routes/webhooks.orders.create.jsx` (line 264)
-3. Or set environment variable: `RESEND_API_KEY=your_key_here`
-4. For custom domain: `RESEND_FROM_EMAIL=noreply@yourdomain.com`
-
-Default uses `onboarding@resend.dev` (Resend's test domain)
+1. Get a Klaviyo private API key from https://www.klaviyo.com
+2. Set environment variable: `KLAVIYO_API_KEY=your_key_here`
+3. For custom domain: `KLAVIYO_FROM_EMAIL=noreply@yourdomain.com`
+4. Optional: update the template in `app/routes/webhooks.orders.create.jsx`
 
 ### Step 5: Test
 
@@ -92,13 +90,12 @@ export const CASHBACK_CONFIG = {
 
 ## 📧 Email Configuration
 
-Email sending is implemented using Resend API:
+Email sending is implemented using Klaviyo Transactional API:
 
-1. Sign up at https://resend.com (free tier available)
-2. Get your API key
-3. Update in webhook handler or set environment variable
-4. Default uses `onboarding@resend.dev` (works immediately)
-5. For custom domain, verify it in Resend first
+1. Sign up at https://www.klaviyo.com
+2. Create a private API key
+3. Set `KLAVIYO_API_KEY` in your environment
+4. Set `KLAVIYO_FROM_EMAIL` to a verified sender
 
 ## 🔧 Required Scopes
 
@@ -155,9 +152,9 @@ This integration is ready - just set up in Loop's admin panel.
 
 **No email received?**
 - Check terminal logs for webhook processing
-- Verify Resend API key is correct
+- Verify Klaviyo API key is correct
 - Check spam folder
-- Default test domain works: `onboarding@resend.dev`
+- Verify sender email is allowed in Klaviyo
 
 **Discount code not working?**
 - Check Shopify Admin → Discounts for the code

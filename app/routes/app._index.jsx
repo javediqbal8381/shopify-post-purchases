@@ -267,7 +267,7 @@ export default function Index() {
             </ul>
           </li>
           <li><strong>Test</strong> - Add items to cart and open cart drawer - the Checkout+ checkbox should appear automatically</li>
-          <li><strong>Email Setup</strong> - Configure your email service (SendGrid/Resend) in the webhook handler</li>
+          <li><strong>Email Setup</strong> - Configure Klaviyo email settings in the webhook handler</li>
         </ol>
         
         <div style={{ marginTop: "16px", padding: "12px", background: "#e3f2fd", borderRadius: "8px", borderLeft: "4px solid #2196f3" }}>

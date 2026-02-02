@@ -123,13 +123,10 @@ Total: $57.35
 
 To automatically EMAIL cashback codes:
 
-1. Get API key from:
-   - [Resend.com](https://resend.com) (easiest) OR
-   - SendGrid / Mailgun
-
-2. Edit: `app/routes/webhooks.orders.create.jsx`
-3. Uncomment email sending code (line ~150)
-4. Add your API key
+1. Get a Klaviyo private API key from [Klaviyo](https://www.klaviyo.com)
+2. Set `KLAVIYO_API_KEY` in your environment
+3. Set `KLAVIYO_FROM_EMAIL` to a verified sender
+4. Edit the template in `app/routes/webhooks.orders.create.jsx` if needed
 
 ---
 

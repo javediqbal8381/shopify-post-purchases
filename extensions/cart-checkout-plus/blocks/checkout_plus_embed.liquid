@@ -76,8 +76,33 @@
           display: none !important;
         }
         
+        /* Remove ::after pseudo-element from checkout button that creates border */
+        .cart__checkout-button::after,
+        button[name="checkout"]::after,
+        #CartDrawer-Checkout::after {
+          display: none !important;
+          content: none !important;
+        }
+        
+        /* Loading spinner */
+        .checkout-plus-spinner {
+          display: inline-block;
+          width: 18px;
+          height: 18px;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-radius: 50%;
+          border-top-color: #fff;
+          animation: checkout-plus-spin 0.8s linear infinite;
+          vertical-align: middle;
+        }
+        
+        @keyframes checkout-plus-spin {
+          to { transform: rotate(360deg); }
+        }
+        
         .checkout-plus-embed {
-          margin: 16px 0;
+          marginTop: 16px;
+
         }
         
         .checkout-plus-header {
@@ -119,7 +144,6 @@
           text-transform: uppercase;
           background: #c47a52;
           color: white;
-          margin-bottom: 16px;
         }
         
         .checkout-plus-btn-primary:disabled {
@@ -137,7 +161,7 @@
       </style>
       
       <div class="checkout-plus-header">
-        <span class="checkout-plus-title">Kinfield Checkout+</span>
+        <span class="checkout-plus-title">Checkout+</span>
         <span class="checkout-plus-fee">$<span class="checkout-plus-price">0.00</span></span>
       </div>
       
@@ -265,7 +289,27 @@
     const defaultCheckoutBtn = document.querySelector('[name="checkout"], button[type="submit"], .cart__checkout-button, [class*="checkout-button"]');
     if (defaultCheckoutBtn) {
       // Change button text
-      defaultCheckoutBtn.textContent = 'Continue Without Checkout+';
+      defaultCheckoutBtn.textContent = 'No, go to checkout';
+      
+      // Style as a text link instead of button
+      defaultCheckoutBtn.style.background = 'none';
+      defaultCheckoutBtn.style.border = 'none';
+      defaultCheckoutBtn.style.color = '#666';
+      defaultCheckoutBtn.style.fontSize = '14px';
+      defaultCheckoutBtn.style.fontWeight = '400';
+      defaultCheckoutBtn.style.textDecoration = 'underline';
+      defaultCheckoutBtn.style.cursor = 'pointer';
+      defaultCheckoutBtn.style.padding = '8px 0';
+      defaultCheckoutBtn.style.textAlign = 'center';
+      defaultCheckoutBtn.style.textTransform = 'none';
+      
+      // Hover effect
+      defaultCheckoutBtn.addEventListener('mouseenter', function() {
+        this.style.color = '#333';
+      });
+      defaultCheckoutBtn.addEventListener('mouseleave', function() {
+        this.style.color = '#666';
+      });
       
       // Override click to remove protection first
       defaultCheckoutBtn.addEventListener('click', async function(e) {
@@ -345,7 +389,7 @@
       
       isProcessing = true;
       checkoutWithBtn.disabled = true;
-      checkoutWithBtn.textContent = 'Adding Protection...';
+      checkoutWithBtn.innerHTML = '<span class="checkout-plus-spinner"></span>';
       
       try {
         // First, check if protection product is already in cart

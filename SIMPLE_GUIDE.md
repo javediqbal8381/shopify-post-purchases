@@ -89,8 +89,9 @@ VIP tagged customers get:
 
 The system creates discount codes automatically, but to EMAIL them:
 
-Edit: `app/routes/webhooks.orders.create.jsx`
-Add your email service (SendGrid/Resend)
+1. Add your Klaviyo private API key to `KLAVIYO_API_KEY`
+2. Set `KLAVIYO_FROM_EMAIL` to your verified sender
+3. Edit the template in `app/routes/webhooks.orders.create.jsx` if needed
 
 ---
 

@@ -334,8 +334,8 @@ async function sendCashbackEmail({ email, customerName, discountCode, cashbackAm
     </html>
   `;
 
-  const RESEND_API_KEY = "re_aKFpev2u_KWBN386FVxvFd6GKqtLe7kpY";
-  const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+  const RESEND_API_KEY = "re_YZV1ECpr_3NYamiQGCEffvuyKQisGTRCo";
+  const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@plus.meonutrition.com';
 
   // If Resend API key is configured, use Resend
   console.log(`📧 Attempting to send email to ${email}...`);
