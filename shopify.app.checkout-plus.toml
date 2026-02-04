@@ -18,16 +18,10 @@ api_version = "2026-04"
   [[webhooks.subscriptions]]
   topics = [ "app/scopes_update" ]
   uri = "/webhooks/app/scopes_update"
-  
-  # Note: orders/create webhook needs to be registered manually in Shopify Admin
-  # due to protected customer data requirements
-  # [[webhooks.subscriptions]]
-  # topics = [ "orders/create" ]
-  # uri = "/webhooks/orders/create"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_orders,write_customers,write_discounts,write_price_rules,write_products,write_cart_transforms"
+scopes = "read_orders,write_cart_transforms,write_customers,write_discounts,write_price_rules,write_products"
 
 [auth]
 redirect_urls = [ "https://shopify-post-purchases.vercel.app/api/auth" ]

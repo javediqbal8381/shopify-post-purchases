@@ -37,7 +37,7 @@ export const action = async ({ request }) => {
       // #endregion
       
       // Fallback: create admin client manually using stored session
-      const shopDomain = order.shop_domain || 'checkout-plus-dev-store-2.myshopify.com';
+      const shopDomain = order.shop_domain || 'dev-store2-8.myshopify.com';
       const shopifyServer = await import("../shopify.server");
       const sessions = await shopifyServer.sessionStorage.findSessionsByShop(shopDomain);
       const activeSession = sessions.find(s => s.isOnline === false) || sessions[0];

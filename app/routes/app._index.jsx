@@ -126,206 +126,325 @@ export const action = async ({ request }) => {
 export default function Index() {
   const { protectionProduct, config } = useLoaderData();
   
+  const styles = {
+    container: {
+      minHeight: "100vh",
+      background: "#ffffff",
+      padding: "60px 24px"
+    },
+    maxWidth: {
+      maxWidth: "1100px",
+      margin: "0 auto"
+    },
+    header: {
+      textAlign: "center",
+      marginBottom: "60px"
+    },
+    mainTitle: {
+      fontSize: "36px",
+      fontWeight: "600",
+      color: "#000000",
+      marginBottom: "12px",
+      letterSpacing: "-0.02em"
+    },
+    subtitle: {
+      fontSize: "16px",
+      color: "#666666",
+      fontWeight: "400"
+    },
+    statsGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+      gap: "20px",
+      marginBottom: "60px"
+    },
+    statCard: {
+      background: "#fafafa",
+      padding: "32px 24px",
+      borderRadius: "8px",
+      textAlign: "center"
+    },
+    statLabel: {
+      fontSize: "12px",
+      color: "#999999",
+      fontWeight: "500",
+      textTransform: "uppercase",
+      letterSpacing: "0.05em",
+      marginBottom: "12px"
+    },
+    statValue: {
+      fontSize: "40px",
+      fontWeight: "600",
+      lineHeight: "1"
+    },
+    card: {
+      background: "#ffffff",
+      padding: "40px",
+      borderRadius: "0px",
+      border: "1px solid #e8e8e8",
+      marginBottom: "40px"
+    },
+    cardTitle: {
+      fontSize: "20px",
+      fontWeight: "600",
+      color: "#000000",
+      marginBottom: "24px",
+      letterSpacing: "-0.01em"
+    },
+    heroCard: {
+      background: "#1a3a52",
+      color: "white",
+      padding: "50px 40px",
+      borderRadius: "0px",
+      marginBottom: "60px"
+    },
+    benefitsGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+      gap: "30px",
+      marginTop: "30px"
+    },
+    benefitCard: {
+      padding: "0"
+    },
+    successBadge: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "8px",
+      padding: "10px 16px",
+      background: "#f0fdf4",
+      color: "#166534",
+      borderRadius: "4px",
+      fontSize: "14px",
+      fontWeight: "500",
+      marginBottom: "24px",
+      border: "1px solid #bbf7d0"
+    },
+    button: {
+      background: "#1a3a52",
+      color: "white",
+      padding: "14px 28px",
+      border: "none",
+      borderRadius: "4px",
+      fontSize: "15px",
+      fontWeight: "500",
+      cursor: "pointer",
+      transition: "background 0.2s ease"
+    },
+    infoBox: {
+      background: "#fafafa",
+      border: "none",
+      borderRadius: "4px",
+      padding: "20px",
+      marginTop: "24px"
+    },
+    stepCard: {
+      background: "#ffffff",
+      padding: "24px",
+      borderRadius: "0px",
+      border: "1px solid #e8e8e8",
+      marginBottom: "12px",
+      display: "flex",
+      gap: "20px",
+      alignItems: "flex-start"
+    },
+    stepNumber: {
+      background: "#000000",
+      color: "white",
+      width: "32px",
+      height: "32px",
+      borderRadius: "50%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: "14px",
+      fontWeight: "600",
+      flexShrink: "0"
+    }
+  };
+  
   return (
-    <div style={{ padding: "20px", maxWidth: "1200px", margin: "0 auto" }}>
-      <div style={{ marginBottom: "30px" }}>
-        <h1 style={{ fontSize: "32px", marginBottom: "8px" }}>Cashback & Protection System</h1>
-        <p style={{ color: "#666" }}>Build your own Onwards-style checkout protection</p>
-      </div>
-      
-      {/* Business Model Explanation */}
-      <div style={{ 
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        color: "white",
-        padding: "24px", 
-        borderRadius: "12px", 
-        marginBottom: "20px"
-      }}>
-        <h2 style={{ fontSize: "20px", marginBottom: "16px" }}>💰 How This Makes Money</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-          <div>
-            <h3 style={{ fontSize: "16px", marginBottom: "8px" }}>For Your Customer:</h3>
-            <ul style={{ lineHeight: "1.8", paddingLeft: "20px" }}>
-              <li>Order: $100</li>
-              <li>Pays extra: ${config.INSURANCE_PERCENT} (insurance fee)</li>
-              <li>Gets back: ${config.CASHBACK_PERCENT} (cashback code)</li>
-              <li><strong>Net profit: ${config.CASHBACK_PERCENT - config.INSURANCE_PERCENT} for customer</strong></li>
-            </ul>
-          </div>
-          <div>
-            <h3 style={{ fontSize: "16px", marginBottom: "8px" }}>For You (Store Owner):</h3>
-            <ul style={{ lineHeight: "1.8", paddingLeft: "20px" }}>
-              <li>You keep the ${config.INSURANCE_PERCENT} insurance fee</li>
-              <li>Customer is happy (they got $6 more value)</li>
-              <li>Customer becomes VIP (easier returns)</li>
-              <li><strong>You earn ${config.INSURANCE_PERCENT} per order</strong></li>
-            </ul>
-          </div>
+    <div style={styles.container}>
+      <div style={styles.maxWidth}>
+        {/* Header */}
+        <div style={styles.header}>
+          <h1 style={styles.mainTitle}>Checkout+</h1>
+          <p style={styles.subtitle}>Cashback & Order Protection Sysddtem</p>
         </div>
-        <p style={{ marginTop: "16px", fontSize: "14px", opacity: "0.9" }}>
-          ⚠️ <strong>Why build this yourself?</strong> Onwards takes 75% of the insurance fee ($3 out of $4). Building it yourself means you keep 100% ($4 out of $4).
-        </p>
-      </div>
-      
-      {/* Configuration Card */}
-      <div style={{ 
-        background: "white", 
-        padding: "24px", 
-        borderRadius: "12px", 
-        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-        marginBottom: "20px"
-      }}>
-        <h2 style={{ fontSize: "20px", marginBottom: "16px" }}>Current Configuration</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
-          <div style={{ padding: "16px", background: "#f5f5f5", borderRadius: "8px" }}>
-            <div style={{ fontSize: "14px", color: "#666" }}>Cashback %</div>
-            <div style={{ fontSize: "28px", fontWeight: "bold", color: "#4CAF50" }}>{config.CASHBACK_PERCENT}%</div>
-          </div>
-          <div style={{ padding: "16px", background: "#f5f5f5", borderRadius: "8px" }}>
-            <div style={{ fontSize: "14px", color: "#666" }}>Insurance %</div>
-            <div style={{ fontSize: "28px", fontWeight: "bold", color: "#667eea" }}>{config.INSURANCE_PERCENT}%</div>
-          </div>
-          <div style={{ padding: "16px", background: "#f5f5f5", borderRadius: "8px" }}>
-            <div style={{ fontSize: "14px", color: "#666" }}>Code Expiry</div>
-            <div style={{ fontSize: "28px", fontWeight: "bold" }}>{config.CODE_EXPIRY_DAYS}d</div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Protection Product Setup */}
-      <div style={{ 
-        background: "white", 
-        padding: "24px", 
-        borderRadius: "12px", 
-        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-        marginBottom: "20px"
-      }}>
-        <h2 style={{ fontSize: "20px", marginBottom: "16px" }}>Order Protection Product</h2>
         
-        {protectionProduct ? (
+        {/* Stats Cards */}
+        <div style={styles.statsGrid}>
+          <div style={styles.statCard}>
+            <div style={styles.statLabel}>Cashback Rate</div>
+            <div style={{...styles.statValue, color: "#22c55e"}}>{config.CASHBACK_PERCENT}%</div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={styles.statLabel}>Insurance Fee</div>
+            <div style={{...styles.statValue, color: "#1a3a52"}}>{config.INSURANCE_PERCENT}%</div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={styles.statLabel}>Code Expiry</div>
+            <div style={{...styles.statValue, color: "#000000"}}>{config.CODE_EXPIRY_DAYS}d</div>
+          </div>
+        </div>
+        
+        {/* Hero - Business Model */}
+        <div style={styles.heroCard}>
+          <h2 style={{fontSize: "24px", fontWeight: "600", marginBottom: "30px"}}>How This Works</h2>
+          <div style={styles.benefitsGrid}>
+            <div style={styles.benefitCard}>
+              <h3 style={{fontSize: "16px", fontWeight: "600", marginBottom: "16px"}}>For Your Customers</h3>
+              <ul style={{lineHeight: "2", paddingLeft: "20px", fontSize: "14px", opacity: "0.95"}}>
+                <li>Pay ${config.INSURANCE_PERCENT} protection fee</li>
+                <li>Receive ${config.CASHBACK_PERCENT} cashback code</li>
+                <li>Net gain: ${config.CASHBACK_PERCENT - config.INSURANCE_PERCENT} in value</li>
+                <li>VIP status for easy returns</li>
+              </ul>
+            </div>
+            <div style={styles.benefitCard}>
+              <h3 style={{fontSize: "16px", fontWeight: "600", marginBottom: "16px"}}>For Your Store</h3>
+              <ul style={{lineHeight: "2", paddingLeft: "20px", fontSize: "14px", opacity: "0.95"}}>
+                <li>Keep 100% of ${config.INSURANCE_PERCENT} fee</li>
+                <li>Build customer loyalty</li>
+                <li>Increase repeat purchases</li>
+                <li>Own your customer data</li>
+              </ul>
+            </div>
+          </div>
+          <div style={{marginTop: "30px", padding: "16px", background: "rgba(255,255,255,0.1)", borderRadius: "4px", fontSize: "14px", opacity: "0.9"}}>
+            <strong>Why Build This Yourself?</strong> Third-party services take 75% of fees. Building in-house means you keep all revenue.
+          </div>
+        </div>
+        
+        {/* Protection Product Setup */}
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Protection Product</h2>
+          
+          {protectionProduct ? (
+            <>
+              <div style={styles.successBadge}>
+                <span>✓</span>
+                <span>Product Successfully Created</span>
+              </div>
+              <div style={{background: "#fafafa", padding: "24px", borderRadius: "4px"}}>
+                <div style={{display: "grid", gap: "16px", fontSize: "14px"}}>
+                  <div style={{display: "flex", justifyContent: "space-between", paddingBottom: "12px", borderBottom: "1px solid #e8e8e8"}}>
+                    <span style={{color: "#666666"}}>Product Name</span>
+                    <span style={{fontWeight: "500"}}>{protectionProduct.title}</span>
+                  </div>
+                  <div style={{display: "flex", justifyContent: "space-between", paddingBottom: "12px", borderBottom: "1px solid #e8e8e8"}}>
+                    <span style={{color: "#666666"}}>Handle</span>
+                    <span style={{fontFamily: "monospace", fontSize: "13px"}}>{protectionProduct.handle}</span>
+                  </div>
+                  <div style={{display: "flex", justifyContent: "space-between", paddingBottom: "12px", borderBottom: "1px solid #e8e8e8"}}>
+                    <span style={{color: "#666666"}}>Variant ID</span>
+                    <span style={{fontFamily: "monospace", fontSize: "13px"}}>{protectionProduct.variants.nodes[0]?.id}</span>
+                  </div>
+                  <div style={{display: "flex", justifyContent: "space-between"}}>
+                    <span style={{color: "#666666"}}>Status</span>
+                    <span style={{color: "#22c55e", fontWeight: "500"}}>Active</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <p style={{marginBottom: "24px", color: "#666666", fontSize: "14px", lineHeight: "1.6"}}>
+                Create the hidden protection product that will be automatically added to cart when customers opt in for protection.
+              </p>
+              <Form method="post">
+                <input type="hidden" name="action" value="create_product" />
+                <button 
+                  type="submit" 
+                  style={styles.button}
+                  onMouseOver={(e) => e.target.style.background = "#0f2537"}
+                  onMouseOut={(e) => e.target.style.background = "#1a3a52"}
+                >
+                  Create Protection Product
+                </button>
+              </Form>
+            </>
+          )}
+        </div>
+        
+        {/* How It Works Flow */}
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Customer Journey</h2>
           <div>
-            <div style={{ padding: "16px", background: "#e8f5e9", borderRadius: "8px", marginBottom: "16px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "20px" }}>✅</span>
-                <span style={{ fontWeight: "600" }}>Protection product is set up!</span>
+            <div style={styles.stepCard}>
+              <div style={styles.stepNumber}>1</div>
+              <div>
+                <h3 style={{fontSize: "15px", fontWeight: "500", marginBottom: "6px"}}>Cart Upsell Appears</h3>
+                <p style={{fontSize: "14px", color: "#666666", margin: "0", lineHeight: "1.5"}}>Customer sees protection offer with clear benefits in their cart drawer</p>
               </div>
             </div>
-            <div style={{ padding: "16px", background: "#f5f5f5", borderRadius: "8px" }}>
-              <p><strong>Product ID:</strong> {protectionProduct.id}</p>
-              <p><strong>Title:</strong> {protectionProduct.title}</p>
-              <p><strong>Handle:</strong> {protectionProduct.handle}</p>
-              <p><strong>Variant ID:</strong> {protectionProduct.variants.nodes[0]?.id}</p>
-              <p style={{ marginTop: "12px", fontSize: "14px", color: "#666" }}>
-                Copy the Variant ID above and add it to your cart theme extension settings.
-              </p>
+            <div style={styles.stepCard}>
+              <div style={styles.stepNumber}>2</div>
+              <div>
+                <h3 style={{fontSize: "15px", fontWeight: "500", marginBottom: "6px"}}>Customer Opts In</h3>
+                <p style={{fontSize: "14px", color: "#666666", margin: "0", lineHeight: "1.5"}}>Protection product automatically added to cart with dynamic pricing</p>
+              </div>
+            </div>
+            <div style={styles.stepCard}>
+              <div style={styles.stepNumber}>3</div>
+              <div>
+                <h3 style={{fontSize: "15px", fontWeight: "500", marginBottom: "6px"}}>Order Completed</h3>
+                <p style={{fontSize: "14px", color: "#666666", margin: "0", lineHeight: "1.5"}}>Webhook detects protection purchase and triggers automation</p>
+              </div>
+            </div>
+            <div style={styles.stepCard}>
+              <div style={styles.stepNumber}>4</div>
+              <div>
+                <h3 style={{fontSize: "15px", fontWeight: "500", marginBottom: "6px"}}>Code Generated</h3>
+                <p style={{fontSize: "14px", color: "#666666", margin: "0", lineHeight: "1.5"}}>Unique cashback discount code created via Shopify Admin API</p>
+              </div>
+            </div>
+            <div style={styles.stepCard}>
+              <div style={styles.stepNumber}>5</div>
+              <div>
+                <h3 style={{fontSize: "15px", fontWeight: "500", marginBottom: "6px"}}>Email Delivered</h3>
+                <p style={{fontSize: "14px", color: "#666666", margin: "0", lineHeight: "1.5"}}>Customer receives cashback code via Klaviyo and gets VIP tag</p>
+              </div>
             </div>
           </div>
-        ) : (
-          <div>
-            <p style={{ marginBottom: "16px", color: "#666" }}>
-              Create a hidden product that will be added to cart when customers opt for protection.
+        </div>
+        
+        {/* Setup Guide */}
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Quick Setup Guide</h2>
+          <div style={{fontSize: "14px", lineHeight: "1.8", color: "#333333"}}>
+            <div style={{marginBottom: "24px"}}>
+              <strong style={{display: "block", marginBottom: "8px", fontSize: "15px", color: "#000000"}}>1. Enable Theme Extension</strong>
+              <ul style={{paddingLeft: "20px", margin: "8px 0", color: "#666666"}}>
+                <li>Go to Online Store → Themes</li>
+                <li>Click Customize on active theme</li>
+                <li>Find App embeds in sidebar</li>
+                <li>Toggle Checkout+ (Auto-inject) to ON</li>
+              </ul>
+            </div>
+            <div style={{marginBottom: "24px"}}>
+              <strong style={{display: "block", marginBottom: "8px", fontSize: "15px", color: "#000000"}}>2. Enable Cart Transformer</strong>
+              <ul style={{paddingLeft: "20px", margin: "8px 0", color: "#666666"}}>
+                <li>Go to Settings → Checkout</li>
+                <li>Scroll to Cart transformer section</li>
+                <li>Enable the transformer function</li>
+              </ul>
+            </div>
+            <div>
+              <strong style={{display: "block", marginBottom: "8px", fontSize: "15px", color: "#000000"}}>3. Configure Klaviyo</strong>
+              <ul style={{paddingLeft: "20px", margin: "8px 0", color: "#666666"}}>
+                <li>Add Klaviyo API key to environment variables</li>
+                <li>Set up email template for cashback codes</li>
+                <li>Test email delivery with test order</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div style={styles.infoBox}>
+            <strong style={{fontSize: "14px"}}>Pro Tip</strong>
+            <p style={{margin: "8px 0 0", fontSize: "13px", color: "#666666", lineHeight: "1.5"}}>
+              Run <code style={{background: "#e8e8e8", padding: "2px 6px", borderRadius: "2px", fontFamily: "monospace"}}>shopify app deploy</code> after any extension changes to see them reflected in your store.
             </p>
-            <Form method="post">
-              <input type="hidden" name="action" value="create_product" />
-              <button
-                type="submit"
-                style={{
-                  background: "#4CAF50",
-                  color: "white",
-                  padding: "12px 24px",
-                  border: "none",
-                  borderRadius: "6px",
-                  fontSize: "16px",
-                  fontWeight: "600",
-                  cursor: "pointer"
-                }}
-              >
-                Create Protection Product
-              </button>
-            </Form>
-          </div>
-        )}
-      </div>
-      
-      {/* Setup Instructions */}
-      <div style={{ 
-        background: "white", 
-        padding: "24px", 
-        borderRadius: "12px", 
-        boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
-      }}>
-        <h2 style={{ fontSize: "20px", marginBottom: "16px" }}>Setup Instructions</h2>
-        <ol style={{ lineHeight: "1.8", paddingLeft: "20px" }}>
-          <li><strong>Create Protection Product</strong> - Click the button above (if not already created)</li>
-          <li><strong>Enable Cart Drawer Extension</strong> - Follow these steps:
-            <ul style={{ marginTop: "8px", paddingLeft: "20px", lineHeight: "1.6" }}>
-              <li>Go to <strong>Online Store → Themes</strong> in Shopify Admin</li>
-              <li>Click <strong>Customize</strong> on your active theme</li>
-              <li>In the theme customizer, look for <strong>"App embeds"</strong> in the left sidebar (or click "..." menu)</li>
-              <li>Find <strong>"Checkout+ (Auto-inject)"</strong> and toggle it <strong>ON</strong></li>
-              <li>Click <strong>Save</strong></li>
-            </ul>
-          </li>
-          <li><strong>Test</strong> - Add items to cart and open cart drawer - the Checkout+ checkbox should appear automatically</li>
-          <li><strong>Email Setup</strong> - Configure Klaviyo email settings in the webhook handler</li>
-        </ol>
-        
-        <div style={{ marginTop: "16px", padding: "12px", background: "#e3f2fd", borderRadius: "8px", borderLeft: "4px solid #2196f3" }}>
-          <strong>💡 Tip:</strong> If you can't find "App embeds", make sure you've deployed the extension first using <code>shopify app deploy</code>
-        </div>
-        
-        <div style={{ marginTop: "20px", padding: "16px", background: "#fff3cd", borderRadius: "8px", borderLeft: "4px solid #ffc107" }}>
-          <strong>⚠️ Important:</strong>
-          <p style={{ marginTop: "8px", fontSize: "14px" }}>
-            Make sure to configure the email sending service in the webhook handler code to send cashback codes to customers.
-          </p>
-        </div>
-      </div>
-      
-      {/* How It Works */}
-      <div style={{ 
-        background: "white", 
-        padding: "24px", 
-        borderRadius: "12px", 
-        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-        marginTop: "20px"
-      }}>
-        <h2 style={{ fontSize: "20px", marginBottom: "16px" }}>How It Works</h2>
-        <div style={{ display: "grid", gap: "12px" }}>
-          <div style={{ display: "flex", gap: "12px", padding: "12px", background: "#f5f5f5", borderRadius: "8px" }}>
-            <span style={{ fontSize: "24px" }}>1️⃣</span>
-            <div>
-              <strong>Customer sees upsell in cart</strong>
-              <p style={{ fontSize: "14px", color: "#666", margin: "4px 0 0" }}>Shows insurance fee + cashback they'll earn</p>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "12px", padding: "12px", background: "#f5f5f5", borderRadius: "8px" }}>
-            <span style={{ fontSize: "24px" }}>2️⃣</span>
-            <div>
-              <strong>They check the box</strong>
-              <p style={{ fontSize: "14px", color: "#666", margin: "4px 0 0" }}>Protection product added to cart automatically</p>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "12px", padding: "12px", background: "#f5f5f5", borderRadius: "8px" }}>
-            <span style={{ fontSize: "24px" }}>3️⃣</span>
-            <div>
-              <strong>Order completes</strong>
-              <p style={{ fontSize: "14px", color: "#666", margin: "4px 0 0" }}>Webhook detects protection purchase</p>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "12px", padding: "12px", background: "#f5f5f5", borderRadius: "8px" }}>
-            <span style={{ fontSize: "24px" }}>4️⃣</span>
-            <div>
-              <strong>Cashback code generated</strong>
-              <p style={{ fontSize: "14px", color: "#666", margin: "4px 0 0" }}>Discount code created via Admin API</p>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "12px", padding: "12px", background: "#f5f5f5", borderRadius: "8px" }}>
-            <span style={{ fontSize: "24px" }}>5️⃣</span>
-            <div>
-              <strong>Email sent to customer</strong>
-              <p style={{ fontSize: "14px", color: "#666", margin: "4px 0 0" }}>Customer receives cashback code + tagged as VIP</p>
-            </div>
           </div>
         </div>
       </div>

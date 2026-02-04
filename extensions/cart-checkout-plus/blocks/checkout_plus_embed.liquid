@@ -22,7 +22,11 @@
   const originalFetch = window.fetch;
   
   // Common cart drawer selectors (works with most themes)
+  // More dynamic approach - look for any element with cart-related keywords
+  const CART_KEYWORDS = ['cart', 'drawer', 'mini', 'slide', 'popup', 'modal', 'upcart', 'sidecart'];
+  
   const CART_DRAWER_SELECTORS = [
+    '.styles_CartPreview__card__',  // Upcart
     '[id*="cart-drawer"]',
     '[id*="CartDrawer"]',
     '[class*="cart-drawer"]',
@@ -35,6 +39,37 @@
     '[class*="mini-cart"]'
   ];
   
+  // Dynamic detection: Find any visible element with cart keywords and checkout button
+  function findCartDrawerDynamically() {
+    const allElements = document.querySelectorAll('*');
+    
+    for (const el of allElements) {
+      // Skip if not visible
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+        continue;
+      }
+      
+      // Check if element has cart-related class/id AND contains checkout button
+      const hasCartKeyword = CART_KEYWORDS.some(keyword => {
+        const id = (el.id || '').toLowerCase();
+        const className = (el.className || '').toString().toLowerCase();
+        return id.includes(keyword) || className.includes(keyword);
+      });
+      
+      if (hasCartKeyword) {
+        // Check if it contains a checkout button
+        const hasCheckoutBtn = el.querySelector('[href*="/checkout"], [href*="checkout"], button[name="checkout"], .checkout-button, [class*="checkout"]');
+        if (hasCheckoutBtn) {
+          console.log('[Checkout+ Embed] Dynamic cart drawer found:', el);
+          return el;
+        }
+      }
+    }
+    
+    return null;
+  }
+  
   // Common cart page selectors
   const CART_PAGE_SELECTORS = [
     'form[action*="/cart"]',
@@ -46,6 +81,10 @@
   
   // Common cart footer/actions selectors (where checkout button lives)
   const CART_FOOTER_SELECTORS = [
+    '.upcart-footer',                      // ADD THIS
+  '.upcart-checkout-button-container',   // ADD THIS
+  'cart-footer',
+  'cart-actions',
     'cart-footer',
     'cart-actions',
     '.cart-footer',
@@ -182,12 +221,18 @@
   
   // Find cart container (drawer or page)
   function findCartContainer() {
-    // Check for cart drawer first
+    // Try predefined selectors first (faster)
     for (const selector of CART_DRAWER_SELECTORS) {
       const drawer = document.querySelector(selector);
       if (drawer && (drawer.offsetParent !== null || drawer.style.display !== 'none')) {
         return { container: drawer, type: 'drawer' };
       }
+    }
+    
+    // Fallback: Dynamic detection for unknown cart implementations
+    const dynamicCart = findCartDrawerDynamically();
+    if (dynamicCart) {
+      return { container: dynamicCart, type: 'drawer' };
     }
     
     // Check for cart page
@@ -203,9 +248,46 @@
     return null;
   }
   
+  // Hide the Order Protection product from cart display
+  function hideProtectionProduct() {
+    // Find all links in the cart
+    const allLinks = document.querySelectorAll('a');
+    
+    for (const link of allLinks) {
+      const linkText = (link.textContent || link.innerText || '').trim();
+      
+      // Check if this link contains "Order Protection"
+      if (linkText.includes('Order Protection') || linkText.toLowerCase().includes('protection')) {
+        console.log('[Checkout+ Embed] Found Order Protection link:', link);
+        
+        // Go up 6 levels to find the product container
+        let container = link;
+        for (let i = 0; i < 6; i++) {
+          if (container.parentElement) {
+            container = container.parentElement;
+          } else {
+            break;
+          }
+        }
+        
+        // Hide the container
+        if (container && container !== document.body && container !== document.documentElement) {
+          container.style.display = 'none';
+          console.log('[Checkout+ Embed] Hidden protection product container:', container);
+        }
+      }
+    }
+  }
+  
   // Find insertion point in cart
   function findInsertionPoint(cartContainer) {
-    // Try cart footer first (best UX)
+    // For Upcart, just return the footer - we'll replace its contents
+    const upcartFooter = cartContainer.querySelector('.upcart-footer');
+    if (upcartFooter) {
+      return upcartFooter;
+    }
+    
+    // Try cart footer first (best UX) for other carts
     for (const selector of CART_FOOTER_SELECTORS) {
       const footer = cartContainer.querySelector(selector);
       if (footer) {
@@ -253,23 +335,37 @@
     const ui = createCheckoutPlusUI();
     ui.setAttribute('data-injected', 'true');
     
-    // Find the cart-drawer__footer section (where subtotal and taxes text live)
-    const drawerFooter = container.querySelector('.cart-drawer__footer');
-    const cartCtas = container.querySelector('.cart__ctas');
-    
-    if (drawerFooter && cartCtas) {
-      // Insert right before the cart__ctas section (after subtotal, before buttons)
-      cartCtas.insertAdjacentElement('beforebegin', ui);
-    } else if (drawerFooter) {
-      // Insert at end of drawer footer
-      drawerFooter.appendChild(ui);
+    // Special handling for Upcart - clear footer and inject our UI
+    const isUpcartFooter = insertionPoint.classList.contains('upcart-footer');
+    if (isUpcartFooter) {
+      // Clear the footer completely
+      insertionPoint.innerHTML = '';
+      
+      // Inject our UI
+      insertionPoint.appendChild(ui);
+      
+      // Add checkout link below
+      const checkoutLink = document.createElement('a');
+      checkoutLink.href = '/checkout';
+      checkoutLink.textContent = 'No, go to checkout';
+      checkoutLink.style.cssText = 'display: block; text-align: center; color: #666; font-size: 14px; text-decoration: underline; padding: 12px 0; cursor: pointer;';
+      checkoutLink.addEventListener('mouseenter', function() {
+        this.style.color = '#333';
+      });
+      checkoutLink.addEventListener('mouseleave', function() {
+        this.style.color = '#666';
+      });
+      insertionPoint.appendChild(checkoutLink);
     } else {
-      // Fallback: use the original insertion point
+      // Standard injection for other carts
       insertionPoint.appendChild(ui);
     }
     
     injectedInstances.add(instanceId);
     initializeUI(ui);
+    
+    // Hide the protection product from display
+    hideProtectionProduct();
     
     return true;
   }
@@ -465,6 +561,9 @@
     clearTimeout(observerTimeout);
     observerTimeout = setTimeout(() => {
       let shouldInject = false;
+      
+      // Also hide protection product on any DOM mutation (cart updates)
+      hideProtectionProduct();
       
       // Check if UI already exists
       const existingUI = document.querySelector('.checkout-plus-embed');

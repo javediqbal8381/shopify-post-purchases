@@ -200,5 +200,5 @@ Customer orders: **$50 protein powder**
 
 ---
 
-Need help? Check the terminal for errors or test on checkout-plus-dev-store-2.myshopify.com first!
+Need help? Check the terminal for errors or test on dev-store2-8.myshopify.com first!
 

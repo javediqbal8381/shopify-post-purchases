@@ -6,7 +6,7 @@
 echo "Creating Order Protection product..."
 echo ""
 echo "Please go to your app admin dashboard:"
-echo "https://admin.shopify.com/store/checkout-plus-dev-store-2/apps/checkout-plus"
+echo "https://admin.shopify.com/store/dev-store2-8/apps/checkout-plus"
 echo ""
 echo "Then click the 'Create Protection Product' button"
 echo ""
