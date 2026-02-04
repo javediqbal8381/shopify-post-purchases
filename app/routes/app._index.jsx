@@ -192,7 +192,7 @@ export default function Index() {
       letterSpacing: "-0.01em"
     },
     heroCard: {
-      background: "#1a3a52",
+      background: "#142b6f",
       color: "white",
       padding: "50px 40px",
       borderRadius: "0px",
@@ -221,7 +221,7 @@ export default function Index() {
       border: "1px solid #bbf7d0"
     },
     button: {
-      background: "#1a3a52",
+      background: "#142b6f",
       color: "white",
       padding: "14px 28px",
       border: "none",
@@ -280,7 +280,7 @@ export default function Index() {
           </div>
           <div style={styles.statCard}>
             <div style={styles.statLabel}>Insurance Fee</div>
-            <div style={{...styles.statValue, color: "#1a3a52"}}>{config.INSURANCE_PERCENT}%</div>
+            <div style={{...styles.statValue, color: "#142b6f"}}>{config.INSURANCE_PERCENT}%</div>
           </div>
           <div style={styles.statCard}>
             <div style={styles.statLabel}>Code Expiry</div>
@@ -357,8 +357,8 @@ export default function Index() {
                 <button 
                   type="submit" 
                   style={styles.button}
-                  onMouseOver={(e) => e.target.style.background = "#0f2537"}
-                  onMouseOut={(e) => e.target.style.background = "#1a3a52"}
+                  onMouseOver={(e) => e.target.style.background = "#0f1f4f"}
+                  onMouseOut={(e) => e.target.style.background = "#142b6f"}
                 >
                   Create Protection Product
                 </button>
