@@ -269,7 +269,7 @@ export default function Index() {
         {/* Header */}
         <div style={styles.header}>
           <h1 style={styles.mainTitle}>Checkout+</h1>
-          <p style={styles.subtitle}>Cashback & Order Protection Sysddtem</p>
+          <p style={styles.subtitle}>Cashback & Order Protection System</p>
         </div>
         
         {/* Stats Cards */}

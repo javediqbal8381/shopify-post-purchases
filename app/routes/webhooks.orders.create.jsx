@@ -1,5 +1,6 @@
 import { authenticate } from "../shopify.server";
 import { CASHBACK_CONFIG } from "../config";
+import { getEmailTemplate } from "../email-templates/utils";
 
 // Webhook handler for order creation
 // Processes cashback rewards when customers opt-in to order protection
@@ -282,57 +283,24 @@ export const action = async ({ request }) => {
 };
 
 async function sendCashbackEmail({ email, customerName, discountCode, cashbackAmount, orderNumber, shopDomain }) {
-  const emailTemplate = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-        .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-        .code-box { background: white; padding: 20px; text-align: center; margin: 20px 0; border: 2px dashed #667eea; border-radius: 8px; }
-        .code { font-size: 28px; font-weight: bold; color: #667eea; letter-spacing: 2px; }
-        .amount { font-size: 32px; color: #4CAF50; font-weight: bold; }
-        .cta { background: #4CAF50; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 20px 0; }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>🎉 Your Cashback is Here!</h1>
-        </div>
-        <div class="content">
-          <p>Hi ${customerName},</p>
-          <p>Thank you for your order ${orderNumber}! As promised, here's your cashback reward:</p>
-          
-          <div class="code-box">
-            <p style="margin: 0; font-size: 16px; color: #666;">Your Cashback Amount</p>
-            <div class="amount">$${cashbackAmount}</div>
-            <p style="margin: 20px 0 10px; font-size: 16px; color: #666;">Discount Code</p>
-            <div class="code">${discountCode}</div>
-          </div>
-          
-          <p><strong>How to use:</strong></p>
-          <ul>
-            <li>Valid on your next purchase</li>
-            <li>Works store-wide on all products</li>
-            <li>Valid for ${CASHBACK_CONFIG.CODE_EXPIRY_DAYS} days</li>
-            <li>One-time use only</li>
-          </ul>
-          
-          <div style="text-align: center;">
-            <a href="https://${shopDomain}" class="cta">Shop Now</a>
-          </div>
-          
-          <p style="margin-top: 30px; font-size: 14px; color: #666;">
-            Thanks for being a VIP customer! Enjoy your cashback reward.
-          </p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
+  // Calculate expiry date
+  const expiryDate = new Date();
+  expiryDate.setDate(expiryDate.getDate() + CASHBACK_CONFIG.CODE_EXPIRY_DAYS);
+  const formattedExpiry = expiryDate.toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+
+  // Load and populate the email template
+  const emailHtml = getEmailTemplate('meonutrition-cashback', {
+    CUSTOMER_NAME: customerName,
+    CASHBACK_CODE: discountCode,
+    CASHBACK_AMOUNT: `$${cashbackAmount}`,
+    STORE_URL: `https://${shopDomain}`,
+    EXPIRY_DATE: formattedExpiry,
+    ORDER_NUMBER: orderNumber
+  });
 
   const RESEND_API_KEY = "re_YZV1ECpr_3NYamiQGCEffvuyKQisGTRCo";
   const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@plus.meonutrition.com';
@@ -352,7 +320,7 @@ async function sendCashbackEmail({ email, customerName, discountCode, cashbackAm
           from: FROM_EMAIL,
           to: email,
           subject: `🎉 You earned $${cashbackAmount} cashback!`,
-          html: emailTemplate,
+          html: emailHtml,
         }),
       });
 

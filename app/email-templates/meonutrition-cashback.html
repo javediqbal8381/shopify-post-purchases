@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Cashback Code</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background-color: #f5f5f5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+    }
+    .header {
+      background-color: #142b6f;
+      padding: 40px 30px;
+      text-align: center;
+    }
+    .logo {
+      color: #ffffff;
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin: 0;
+    }
+    .tagline {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 14px;
+      margin: 8px 0 0;
+    }
+    .content {
+      padding: 50px 30px;
+    }
+    .greeting {
+      font-size: 18px;
+      color: #000000;
+      margin: 0 0 20px;
+      font-weight: 500;
+    }
+    .message {
+      font-size: 15px;
+      color: #666666;
+      line-height: 1.6;
+      margin: 0 0 30px;
+    }
+    .code-section {
+      background-color: #fafafa;
+      border: 2px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 30px;
+      text-align: center;
+      margin: 30px 0;
+    }
+    .code-label {
+      font-size: 12px;
+      color: #999999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 0 0 12px;
+      font-weight: 600;
+    }
+    .code {
+      font-size: 32px;
+      font-weight: 700;
+      color: #142b6f;
+      letter-spacing: 2px;
+      margin: 0 0 16px;
+      font-family: monospace;
+    }
+    .amount {
+      font-size: 20px;
+      color: #22c55e;
+      font-weight: 600;
+      margin: 0;
+    }
+    .info-box {
+      background-color: #f0fdf4;
+      border-left: 4px solid #22c55e;
+      padding: 20px;
+      margin: 30px 0;
+      border-radius: 4px;
+    }
+    .info-box p {
+      margin: 0;
+      font-size: 14px;
+      color: #166534;
+      line-height: 1.5;
+    }
+    .expiry {
+      font-size: 13px;
+      color: #999999;
+      text-align: center;
+      margin: 20px 0 0;
+    }
+    .cta-button {
+      display: inline-block;
+      background-color: #142b6f;
+      color: #ffffff;
+      text-decoration: none;
+      padding: 16px 40px;
+      border-radius: 4px;
+      font-size: 15px;
+      font-weight: 600;
+      margin: 20px 0;
+    }
+    .benefits {
+      margin: 30px 0;
+      padding: 0;
+    }
+    .benefit-item {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      font-size: 14px;
+      color: #666666;
+      line-height: 1.5;
+    }
+    .benefit-icon {
+      color: #22c55e;
+      font-size: 18px;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+    .footer {
+      background-color: #fafafa;
+      padding: 30px;
+      text-align: center;
+      border-top: 1px solid #e8e8e8;
+    }
+    .footer-text {
+      font-size: 13px;
+      color: #999999;
+      margin: 8px 0;
+      line-height: 1.5;
+    }
+    .social-links {
+      margin: 20px 0;
+    }
+    .divider {
+      height: 1px;
+      background-color: #e8e8e8;
+      margin: 30px 0;
+    }
+    @media only screen and (max-width: 600px) {
+      .content {
+        padding: 30px 20px;
+      }
+      .code {
+        font-size: 24px;
+      }
+      .amount {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <!-- Header -->
+    <div class="header">
+      <h1 class="logo">MEO NUTRITION</h1>
+      <p class="tagline">Where Wellness Meets Excellence</p>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content">
+      <p class="greeting">Hi {{CUSTOMER_NAME}},</p>
+      
+      <p class="message">
+        Thank you for choosing Checkout+ protection on your recent order! As promised, here's your exclusive cashback code to use on your next purchase.
+      </p>
+
+      <!-- Code Section -->
+      <div class="code-section">
+        <p class="code-label">Your Cashback Code</p>
+        <div class="code">{{CASHBACK_CODE}}</div>
+        <p class="amount">Worth {{CASHBACK_AMOUNT}}</p>
+      </div>
+
+      <!-- Info Box -->
+      <div class="info-box">
+        <p><strong>✓ VIP Status Activated</strong></p>
+        <p style="margin-top: 8px;">Your account has been upgraded to VIP status. Enjoy priority support and hassle-free returns on all your orders.</p>
+      </div>
+
+      <!-- Benefits -->
+      <div class="benefits">
+        <div class="benefit-item">
+          <span class="benefit-icon">✓</span>
+          <span><strong>Easy to Use:</strong> Apply this code at checkout on your next purchase</span>
+        </div>
+        <div class="benefit-item">
+          <span class="benefit-icon">✓</span>
+          <span><strong>Stackable:</strong> Combine with other promotions for maximum savings</span>
+        </div>
+        <div class="benefit-item">
+          <span class="benefit-icon">✓</span>
+          <span><strong>Full Coverage:</strong> Enjoy peace of mind with your protected purchase</span>
+        </div>
+      </div>
+
+      <div style="text-align: center;">
+        <a href="{{STORE_URL}}" class="cta-button">Shop Now</a>
+      </div>
+
+      <p class="expiry">
+        ⏰ Code expires: {{EXPIRY_DATE}}
+      </p>
+
+      <div class="divider"></div>
+
+      <p class="message" style="margin-bottom: 0;">
+        Questions? Our support team is here to help. Simply reply to this email or visit our Help Center.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p class="footer-text" style="font-weight: 600; color: #142b6f;">MEO NUTRITION</p>
+      <p class="footer-text">1309 Coffeen Avenue, Sheridan, WY 82801</p>
+      <p class="footer-text" style="margin-top: 16px;">
+        You received this email because you opted for Checkout+ protection.
+      </p>
+      <p class="footer-text" style="font-size: 12px; margin-top: 20px;">
+        © 2026 Meo Nutrition. All rights reserved.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
