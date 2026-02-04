@@ -7,6 +7,7 @@ when i remove an item from cart in the drawer cart our UI hides
 deploy backend in digital ocean droplet
 change the UX of the app dashboard like our meonutrition store.
 change the UX of the email template.
+in cart drawer when i become empty like user remove thelast product then also remove the protestion product.
 
 
 example site from where i get the design and flow idea
