@@ -2,12 +2,15 @@ Shopify anwards+ project
 
 Tasks Todo 
 make the discount code expire after usage so customer unable to use again
-align the UI 
-when i remove an item from cart in the drawer cart our UI hides
+
 deploy backend in digital ocean droplet
-change the UX of the app dashboard like our meonutrition store.
-change the UX of the email template.
-in cart drawer when i become empty like user remove thelast product then also remove the protestion product.
+
+Create a dashboard for the app and there will show the analytics.
+cashback and insurence %age shold be like as onwards
+create a dashboard to show all the details.
+when click on the app in shopify apps section so it shoulkd go to dashboard
+send the cashback email after 30 days.
+ask markus after few days if the onwards installed the checkout+ on the non plus store
 
 
 example site from where i get the design and flow idea
@@ -41,6 +44,9 @@ Name: Any name
    • To see your app, run `shopify app dev`
    .  For an overview of commands, run `shopify app --help`
 
+
+
+create a dev store with plus plan 
 
 
 ——————TODO——————

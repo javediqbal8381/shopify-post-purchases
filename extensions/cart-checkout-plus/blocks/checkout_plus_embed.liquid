@@ -10,6 +10,7 @@
   const CASHBACK_PERCENT = 5;
   const INSURANCE_PERCENT = 4;
   const PROTECTION_HANDLE = 'order-protection';
+  const PROTECTION_TITLE = 'Checkout+'; // Product display name - change here if renamed
   const EMBED_ID = 'checkout-plus-embed-' + Date.now();
   
   // Prevent duplicate injection
@@ -110,9 +111,24 @@
     
     container.innerHTML = `
       <style>
-        /* Hide Order Protection product row in cart */
+        /* Hide Order Protection from UI - Standard Shopify cart */
         tr.cart-item:has(a[href*="/products/order-protection"]) {
-          display: none !important;
+          position: absolute !important;
+          visibility: hidden !important;
+        }
+        
+        /* Hide Order Protection from UI - Upcart */
+        .styles_ProductRow__product__:has(a[href*="/products/order-protection"]),
+        .upcart-product-item:has(a[href*="/products/order-protection"]),
+        div[id*="order-protection"] {
+          position: absolute !important;
+          visibility: hidden !important;
+        }
+        
+        /* Generic fallback for other cart apps */
+        *:has(> a[href*="/products/order-protection"]) {
+          position: absolute !important;
+          visibility: hidden !important;
         }
         
         /* Remove ::after pseudo-element from checkout button that creates border */
@@ -162,6 +178,7 @@
           font-size: 14px;
           font-weight: 400;
           color: #000;
+          transition: opacity 0.2s ease;
         }
         
         .checkout-plus-description {
@@ -171,18 +188,25 @@
           line-height: 1.4;
         }
         
+        .checkout-plus-price,
+        .checkout-plus-cashback,
+        .checkout-plus-total {
+          transition: opacity 0.2s ease;
+        }
+        
         .checkout-plus-btn-primary {
           width: 100%;
           padding: 18px;
           border: none;
-          border-radius: 4px;
+          border-radius: 40px;
           font-size: 16px;
           font-weight: 600;
           cursor: pointer;
           transition: opacity 0.2s;
           text-transform: uppercase;
-          background: #c47a52;
+          background: #142b6f;
           color: white;
+          margin-top: 4px;
         }
         
         .checkout-plus-btn-primary:disabled {
@@ -256,9 +280,9 @@
     for (const link of allLinks) {
       const linkText = (link.textContent || link.innerText || '').trim();
       
-      // Check if this link contains "Order Protection"
-      if (linkText.includes('Order Protection') || linkText.toLowerCase().includes('protection')) {
-        console.log('[Checkout+ Embed] Found Order Protection link:', link);
+      // Check if this link contains the protection product title
+      if (linkText.includes(PROTECTION_TITLE) || linkText.toLowerCase().includes('protection')) {
+        console.log('[checkout_plus] Found protection product link:', link);
         
         // Go up 6 levels to find the product container
         let container = link;
@@ -271,10 +295,10 @@
         }
         
         // Hide the container
-        if (container && container !== document.body && container !== document.documentElement) {
-          container.style.display = 'none';
-          console.log('[Checkout+ Embed] Hidden protection product container:', container);
-        }
+        // if (container && container !== document.body && container !== document.documentElement) {
+        //  container.style.display = 'none';
+        // console.log('[Checkout+ Embed] Hidden protection product container:', container);
+        // }
       }
     }
   }
@@ -307,33 +331,42 @@
   
   // Inject UI into cart
   function injectUI() {
+    console.log('[checkout_plus] injectUI called');
     const cartInfo = findCartContainer();
     if (!cartInfo) {
+      console.log('[checkout_plus] No cart container found');
       return false;
     }
     
     const { container, type } = cartInfo;
+    console.log('[checkout_plus] Cart container found:', type, container);
     const instanceId = `${type}-${container.id || container.className}`;
     
-    // Prevent duplicate injection
-    if (injectedInstances.has(instanceId)) {
-      return true;
-    }
-    
-    // Check if already injected in this container
+    // Check if already injected in this container and still properly rendered
     const existingEmbed = container.querySelector('.checkout-plus-embed');
-    if (existingEmbed) {
-      injectedInstances.add(instanceId);
-      return true;
+    if (existingEmbed && existingEmbed.isConnected) {
+      const hasButton = existingEmbed.querySelector('.checkout-plus-btn-primary');
+      if (hasButton) {
+        console.log('[checkout_plus] Embed already exists and is complete');
+        injectedInstances.add(instanceId);
+        return true;
+      } else {
+        console.log('[checkout_plus] Embed exists but is incomplete, removing and re-injecting');
+        existingEmbed.remove();
+        injectedInstances.delete(instanceId);
+      }
     }
     
     const insertionPoint = findInsertionPoint(container);
+    console.log('[checkout_plus] Insertion point found:', insertionPoint);
     if (!insertionPoint) {
+      console.log('[checkout_plus] No insertion point found');
       return false;
     }
     
     const ui = createCheckoutPlusUI();
     ui.setAttribute('data-injected', 'true');
+    console.log('[checkout_plus] UI created, about to inject');
     
     // Special handling for Upcart - clear footer and inject our UI
     const isUpcartFooter = insertionPoint.classList.contains('upcart-footer');
@@ -362,6 +395,7 @@
     }
     
     injectedInstances.add(instanceId);
+    console.log('[checkout_plus] UI injected successfully at:', insertionPoint);
     initializeUI(ui);
     
     // Hide the protection product from display
@@ -434,7 +468,28 @@
     }
     
     // Calculate prices based on current cart
+    let isUpdating = false;
+    let lastUpdateTime = 0;
+    
     function updatePrices() {
+      // Debounce: Don't update more than once per 500ms
+      const now = Date.now();
+      if (now - lastUpdateTime < 500) {
+        console.log('[checkout_plus] updatePrices debounced (too soon)');
+        return;
+      }
+      lastUpdateTime = now;
+      
+      console.log('[checkout_plus] updatePrices - fetching cart');
+      
+      // Show loading state
+      if (!isUpdating) {
+        isUpdating = true;
+        priceSpan.style.opacity = '0.5';
+        totalSpan.style.opacity = '0.5';
+        cashbackSpan.style.opacity = '0.5';
+      }
+      
       fetch('/cart.js')
         .then(res => res.json())
         .then(cart => {
@@ -457,9 +512,16 @@
           const cashbackAmount = (cartTotal * CASHBACK_PERCENT / 100).toFixed(2);
           const totalWithProtection = (cartTotal + parseFloat(insuranceFee)).toFixed(2);
           
+          // Update with smooth transition
           priceSpan.textContent = insuranceFee;
           totalSpan.textContent = '$' + totalWithProtection;
           cashbackSpan.textContent = cashbackAmount;
+          
+          // Remove loading state
+          priceSpan.style.opacity = '1';
+          totalSpan.style.opacity = '1';
+          cashbackSpan.style.opacity = '1';
+          isUpdating = false;
           
           // Show/hide based on cart total
           if (cartTotal > 0) {
@@ -470,6 +532,11 @@
         })
         .catch(err => {
           console.error('Failed to fetch cart:', err);
+          // Remove loading state on error
+          priceSpan.style.opacity = '1';
+          totalSpan.style.opacity = '1';
+          cashbackSpan.style.opacity = '1';
+          isUpdating = false;
         });
     }
     
@@ -546,12 +613,247 @@
       }
     });
     
-    // Listen for cart updates
-    document.addEventListener('cart:updated', updatePrices);
-    document.addEventListener('cart:refresh', updatePrices);
-    window.addEventListener('cart:updated', updatePrices);
-    window.addEventListener('cart:refresh', updatePrices);
+    // Listen for cart updates - Standard Shopify events
+    document.addEventListener('cart:updated', () => {
+      updatePrices();
+      autoRemoveProtectionIfCartEmpty();
+    });
+    document.addEventListener('cart:refresh', () => {
+      updatePrices();
+      autoRemoveProtectionIfCartEmpty();
+    });
+    window.addEventListener('cart:updated', () => {
+      updatePrices();
+      autoRemoveProtectionIfCartEmpty();
+    });
+    window.addEventListener('cart:refresh', () => {
+      updatePrices();
+      autoRemoveProtectionIfCartEmpty();
+    });
+    
+    // Upcart-specific events
+    window.addEventListener('upcart:cart-updated', () => {
+      console.log('[checkout_plus] Upcart cart-updated event');
+      updatePrices();
+      autoRemoveProtectionIfCartEmpty();
+    });
+    document.addEventListener('upcart:cart-updated', () => {
+      console.log('[checkout_plus] Upcart cart-updated event (document)');
+      updatePrices();
+      autoRemoveProtectionIfCartEmpty();
+    });
   }
+  
+  // Retry injection with exponential backoff for race conditions
+  let injectionRetries = 0;
+  const MAX_RETRIES = 5;
+  
+  function retryInjection(delay = 300) {
+    if (injectionRetries >= MAX_RETRIES) {
+      console.log('[checkout_plus] Max injection retries reached');
+      return;
+    }
+    
+    // Check if UI already exists and is properly rendered
+    const existingUI = document.querySelector('.checkout-plus-embed');
+    if (existingUI && existingUI.isConnected) {
+      const hasButton = existingUI.querySelector('.checkout-plus-btn-primary');
+      if (hasButton) {
+        console.log('[checkout_plus] UI already exists and is complete');
+        return;
+      }
+    }
+    
+    injectionRetries++;
+    console.log('[checkout_plus] Retry injection attempt:', injectionRetries);
+    
+    setTimeout(() => {
+      const success = injectUI();
+      if (!success || injectionRetries < 3) {
+        // Retry with exponential backoff
+        retryInjection(delay * 1.5);
+      } else {
+        injectionRetries = 0; // Reset for next time
+      }
+    }, delay);
+  }
+  
+  // ============================================================================
+  // AUTO-REMOVE PROTECTION WHEN CART BECOMES EMPTY
+  // ============================================================================
+  
+
+  let lastCartItemCount = -1;
+  
+  // Configurable selectors for different cart themes/apps
+  const CART_ITEM_SELECTORS = [
+    '.cart-item',                           // Standard Shopify
+    'tr[id*="CartDrawer-Item"]',           // Standard Shopify table
+    '.styles_ProductRow__product__',       // Upcart
+    '.upcart-product-item',                // Upcart
+    // Add more cart item selectors here as needed
+  ];
+  
+  const ITEM_NAME_SELECTORS = [
+    '.cart-item__name',                    // Standard Shopify
+    'a[href*="order-protection"]',         // Generic link
+    '.upcart-product-title-link',          // Upcart
+    '.upcart-product-title a',             // Upcart alternative
+    // Add more product name selectors here as needed
+  ];
+  
+  const DELETE_BUTTON_SELECTORS = [
+    'cart-remove-button button',                    // Standard Shopify
+    `button[aria-label*="Remove ${PROTECTION_TITLE}"]`, // Standard Shopify aria (dynamic)
+    'button[aria-label*="Remove"]',                 // Generic remove button
+    '.styles_TrashButton__deleteButton__',          // Upcart delete div
+    '.styles_TrashButton__deleteButton__ svg',      // Upcart delete SVG
+    'button[aria-label*="Decrease quantity"]',      // Quantity minus button fallback
+    // Add more delete button selectors here as needed
+  ];
+  
+  /**
+   * Check if cart has only protection product, and remove it by clicking its delete button
+   */
+  function autoRemoveProtectionIfCartEmpty() {
+    originalFetch('/cart.js')
+      .then(res => res.json())
+      .then(cart => {
+        console.log('[checkout_plus] Checking cart, total items:', cart.items.length);
+        
+        // Count regular items (exclude protection)
+        const regularItems = cart.items.filter(item => item.handle !== PROTECTION_HANDLE);
+        const hasProtection = cart.items.some(item => item.handle === PROTECTION_HANDLE);
+        
+        console.log('[checkout_plus] Regular items:', regularItems.length, 'Has protection:', hasProtection);
+        
+        // Track changes
+        if (lastCartItemCount !== -1 && regularItems.length !== lastCartItemCount) {
+          console.log('[checkout_plus] Item count changed:', lastCartItemCount, '->', regularItems.length);
+        }
+        lastCartItemCount = regularItems.length;
+        
+        // If cart empty but protection exists, remove it
+        if (regularItems.length === 0 && hasProtection) {
+          console.log('[checkout_plus] Cart empty, removing protection by clicking delete button');
+          clickProtectionRemoveButton();
+        }
+      })
+      .catch(err => console.error('[checkout_plus] Cart check failed:', err));
+  }
+  
+  /**
+   * Find and click the remove button for the protection product
+   */
+  function clickProtectionRemoveButton() {
+    // Try each cart item selector
+    for (const itemSelector of CART_ITEM_SELECTORS) {
+      const cartRows = document.querySelectorAll(itemSelector);
+      
+      for (const row of cartRows) {
+        // Try each name selector to find the protection product
+        let foundProtection = false;
+        
+        for (const nameSelector of ITEM_NAME_SELECTORS) {
+          const itemName = row.querySelector(nameSelector);
+          if (itemName && (
+            itemName.textContent.includes(PROTECTION_TITLE) ||
+            itemName.href?.includes('order-protection')
+          )) {
+            foundProtection = true;
+            console.log('[checkout_plus] Found protection row:', row);
+            break;
+          }
+        }
+        
+        if (foundProtection) {
+          // Try each delete button selector
+          for (const btnSelector of DELETE_BUTTON_SELECTORS) {
+            const removeElement = row.querySelector(btnSelector);
+            if (removeElement) {
+              console.log('[checkout_plus] Found delete element:', btnSelector);
+              
+              // Click the element (or its parent button if it's an SVG)
+              if (removeElement.tagName === 'BUTTON') {
+                removeElement.click();
+              } else if (removeElement.tagName === 'svg' || removeElement.tagName === 'SVG') {
+                // For SVG, click its parent or the element itself
+                const btn = removeElement.closest('button') || removeElement.parentElement;
+                if (btn) btn.click();
+                else removeElement.click();
+              } else {
+                // For divs or other elements, try clicking directly
+                removeElement.click();
+              }
+              
+              console.log('[checkout_plus] Clicked delete button');
+              return;
+            }
+          }
+        }
+      }
+    }
+    
+    console.log('[checkout_plus] Protection remove button not found');
+  }
+  
+  /**
+   * Poll cart periodically when drawer is visible
+   */
+  setInterval(() => {
+    const cartDrawer = document.querySelector('.styles_CartPreview__card__, [id*="cart-drawer"], [class*="cart-drawer"]');
+    if (cartDrawer && cartDrawer.offsetParent !== null) {
+      autoRemoveProtectionIfCartEmpty();
+    }
+  }, 2000);
+  
+  /**
+   * Watch for DOM changes - detect when cart items are removed
+   */
+  const autoRemoveObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.removedNodes.forEach((node) => {
+        if (node.nodeType === 1) {
+          // Check if removed node is a cart item
+          const isCartItem = node.classList && (
+            node.classList.contains('cart-item') ||
+            (node.hasAttribute('id') && node.id.includes('CartDrawer-Item'))
+          );
+          
+          if (isCartItem) {
+            console.log('[checkout_plus] Cart item removed, checking if should remove protection');
+            setTimeout(() => autoRemoveProtectionIfCartEmpty(), 500);
+          }
+        }
+      });
+    });
+  });
+  
+  // Start observing cart for item removals
+  setTimeout(() => {
+    const cartContainer = document.querySelector('.styles_CartPreview__card__, [id*="cart-drawer"], [class*="cart-drawer"]');
+    if (cartContainer) {
+      autoRemoveObserver.observe(cartContainer, { childList: true, subtree: true });
+      console.log('[checkout_plus] Monitoring cart for item removals');
+    }
+  }, 2000);
+  
+  // ============================================================================
+  
+  // Listen for cart:add events (when Add to Cart button is clicked)
+  document.addEventListener('cart:add', function() {
+    console.log('[checkout_plus] cart:add event detected');
+    injectionRetries = 0;
+    // Wait longer for cart drawer to fully render after add
+    setTimeout(() => retryInjection(500), 800);
+  });
+  
+  // Listen for theme-specific cart add events
+  window.addEventListener('cart:add', function() {
+    console.log('[checkout_plus] window cart:add event detected');
+    injectionRetries = 0;
+    setTimeout(() => retryInjection(500), 800);
+  });
   
   // MutationObserver to detect cart drawer opening
   // But don't interfere if UI already exists
@@ -565,10 +867,16 @@
       // Also hide protection product on any DOM mutation (cart updates)
       hideProtectionProduct();
       
-      // Check if UI already exists
+      // Check if UI already exists and is properly rendered
       const existingUI = document.querySelector('.checkout-plus-embed');
       if (existingUI && existingUI.isConnected) {
-        return; // UI exists, don't re-inject
+        const hasButton = existingUI.querySelector('.checkout-plus-btn-primary');
+        if (hasButton) {
+          return; // UI exists and is complete
+        } else {
+          console.log('[checkout_plus] UI exists but incomplete, will retry');
+          shouldInject = true;
+        }
       }
       
       mutations.forEach((mutation) => {
@@ -623,9 +931,11 @@
       });
       
       if (shouldInject) {
+        injectionRetries = 0;
+        // Longer delay for dynamic cart drawer opening (give other apps time to render)
         setTimeout(() => {
-          injectUI();
-        }, 200);
+          retryInjection(400);
+        }, 600);
       }
     }, 150);
   });
@@ -641,10 +951,16 @@
   // Initial injection attempt
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      setTimeout(injectUI, 500);
+      setTimeout(() => {
+        injectionRetries = 0;
+        retryInjection(500);
+      }, 500);
     });
   } else {
-    setTimeout(injectUI, 500);
+    setTimeout(() => {
+      injectionRetries = 0;
+      retryInjection(500);
+    }, 500);
   }
   
   // Also try injecting on navigation (for SPA themes)
@@ -654,19 +970,21 @@
       lastUrl = window.location.href;
       setTimeout(() => {
         injectedInstances.clear();
-        injectUI();
+        injectionRetries = 0;
+        retryInjection(500);
       }, 500);
     }
   }, 1000);
   
   // Listen for cart AJAX updates (common in modern themes)
-  // Only update prices, don't trigger events to avoid loops
-  // Don't intercept checkout or other critical operations
-  let isUpdating = false;
+  // Only intercept WRITE operations (add/change/update) not READ (cart.js)
+  let isUpdatingViaFetch = false;
   let lastCartUpdate = 0;
   
   window.fetch = function(...args) {
     const url = args[0];
+    const options = args[1] || {};
+    const method = (options.method || 'GET').toUpperCase();
     
     // Don't intercept checkout, payment, or other critical operations
     if (typeof url === 'string') {
@@ -678,76 +996,32 @@
         return originalFetch.apply(this, args);
       }
       
-      // Only handle cart operations
-      if (url.includes('/cart.js') || url.includes('/cart/add') || url.includes('/cart/change')) {
+      // Only handle cart WRITE operations (POST = add/change/update)
+      // Don't intercept cart.js GET requests to avoid infinite loop
+      if ((url.includes('/cart/add') || url.includes('/cart/change') || url.includes('/cart/update')) && method === 'POST') {
         return originalFetch.apply(this, args).then(response => {
           // Debounce updates - only update once per 500ms
           const now = Date.now();
           if (now - lastCartUpdate < 500) {
+            // Still check for empty cart even if debounced
+            setTimeout(() => autoRemoveProtectionIfCartEmpty(), 600);
             return response;
           }
           lastCartUpdate = now;
           
-          // Only update prices if not already updating to prevent loops
-          if (!isUpdating) {
-            isUpdating = true;
-            setTimeout(() => {
-              // Just update prices, don't trigger events
-              // Make sure UI still exists before updating
-              document.querySelectorAll('.checkout-plus-embed').forEach(container => {
-                if (!container.isConnected) return; // Skip if removed from DOM
-                
-                const checkbox = container.querySelector('.checkout-plus-checkbox');
-                const priceSpan = container.querySelector('.checkout-plus-price');
-                const cashbackSpan = container.querySelector('.checkout-plus-cashback');
-                
-                if (checkbox && priceSpan && cashbackSpan) {
-                  // Use original fetch to avoid recursion
-                  originalFetch('/cart.js')
-                    .then(res => {
-                      if (!res.ok) throw new Error('Cart fetch failed');
-                      return res.json();
-                    })
-                    .then(cart => {
-                      let cartTotal = 0;
-                      let protectionVariantId = null;
-                      
-                      cart.items.forEach(item => {
-                        if (item.handle !== PROTECTION_HANDLE) {
-                          cartTotal += item.final_line_price;
-                        } else {
-                          protectionVariantId = item.variant_id;
-                        }
-                      });
-                      
-                      cartTotal = cartTotal / 100;
-                      const insuranceFee = (cartTotal * INSURANCE_PERCENT / 100).toFixed(2);
-                      const cashbackAmount = (cartTotal * CASHBACK_PERCENT / 100).toFixed(2);
-                      
-                      priceSpan.textContent = '$' + insuranceFee;
-                      cashbackSpan.textContent = '$' + cashbackAmount;
-                      checkbox.checked = !!protectionVariantId;
-                    })
-                    .catch(() => {
-                      // Silently fail - don't break cart functionality
-                    })
-                    .finally(() => {
-                      isUpdating = false;
-                    });
-                } else {
-                  isUpdating = false;
-                }
-              });
-              
-              // Re-inject UI if it was removed (cart drawer refresh)
-              setTimeout(() => {
-                if (document.querySelectorAll('.checkout-plus-embed').length === 0) {
-                  injectedInstances.clear();
-                  injectUI();
-                }
-              }, 100);
-            }, 300);
-          }
+          // Check if cart became empty and remove protection
+          setTimeout(() => autoRemoveProtectionIfCartEmpty(), 600);
+          
+          // Trigger price update after cart change
+          setTimeout(() => {
+            document.querySelectorAll('.checkout-plus-embed').forEach(container => {
+              if (container.isConnected) {
+                // Dispatch event to trigger updatePrices
+                document.dispatchEvent(new CustomEvent('cart:updated'));
+              }
+            });
+          }, 300);
+          
           return response;
         });
       }
