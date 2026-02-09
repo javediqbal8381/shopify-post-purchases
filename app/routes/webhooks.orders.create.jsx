@@ -1,9 +1,9 @@
 import { authenticate } from "../shopify.server";
 import { CASHBACK_CONFIG } from "../config";
-import { getEmailTemplate } from "../email-templates/utils";
+import db from "../db.server";
 
 // Webhook handler for order creation
-// Processes cashback rewards when customers opt-in to order protection
+// Schedules delayed cashback rewards (30 days) when customers opt-in to order protection
 
 export const action = async ({ request }) => {
   console.log('🔔 Webhook received: orders/create');
@@ -89,177 +89,62 @@ export const action = async ({ request }) => {
     const cashbackAmount = cashbackAttr?.value || 
       (parseFloat(order.total_price) * CASHBACK_CONFIG.CASHBACK_PERCENT / 100).toFixed(2);
     
-    // Generate discount code
-    const discountCode = `${CASHBACK_CONFIG.DISCOUNT_CODE_PREFIX}${Math.random().toString(36).substr(2, 8).toUpperCase()}`;
-    
     // Handle guest checkout (customer might be null)
     const hasCustomer = order.customer && order.customer.id;
-    
-    // Create discount using modern Discount API
-    const startsAt = new Date().toISOString();
-    const endsAt = new Date(Date.now() + CASHBACK_CONFIG.CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    
-    // Build context (replaces deprecated customerSelection)
-    let context = {};
-    if (hasCustomer) {
-      context = {
-        customers: {
-          add: [`gid://shopify/Customer/${order.customer.id}`]
-        }
-      };
-      // #region agent log
-      debugLog('webhooks.orders.create.jsx:89', 'Context: customer-specific', {customerId: order.customer.id, contextType: 'customers'}, 'A,E');
-      // #endregion
-    } else {
-      // For guest checkout, make it available to all customers
-      context = {
-        all: "ALL"
-      };
-      // #region agent log
-      debugLog('webhooks.orders.create.jsx:98', 'Context: all customers', {contextType: 'all'}, 'A');
-      // #endregion
-    }
-    
-    // #region agent log
-    debugLog('webhooks.orders.create.jsx:103', 'Before discount mutation', {code: discountCode, amount: cashbackAmount, startsAt, endsAt, context: JSON.stringify(context)}, 'A,D');
-    // #endregion
-    
-    const discountResponse = await admin.graphql(
-      `#graphql
-      mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
-        discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
-          codeDiscountNode {
-            id
-            codeDiscount {
-              ... on DiscountCodeBasic {
-                title
-                status
-                codes(first: 1) {
-                  nodes {
-                    code
-                  }
-                }
-              }
-            }
-          }
-          userErrors {
-            field
-            message
-            code
-          }
-        }
-      }`,
-      {
-        variables: {
-          basicCodeDiscount: {
-            title: `Cashback ${cashbackAmount} - Order ${order.name}`,
-            code: discountCode,
-            startsAt,
-            endsAt,
-            context,
-            customerGets: {
-              value: {
-                discountAmount: {
-                  amount: cashbackAmount,
-                  appliesOnEachItem: false
-                }
-              },
-              items: {
-                all: true
-              }
-            },
-            usageLimit: 1,
-            appliesOncePerCustomer: true
-          }
-        }
-      }
-    );
-    
-    const discountData = await discountResponse.json();
-    
-    // #region agent log
-    debugLog('webhooks.orders.create.jsx:151', 'Discount response received', {hasData: !!discountData.data, hasErrors: !!(discountData.errors), responseKeys: Object.keys(discountData)}, 'A,C');
-    // #endregion
-    
-    // Log full response for debugging
-    console.log('📋 Discount creation response:', JSON.stringify(discountData, null, 2));
-    
-    const userErrors = discountData.data?.discountCodeBasicCreate?.userErrors || [];
-    
-    // #region agent log
-    debugLog('webhooks.orders.create.jsx:160', 'User errors check', {errorCount: userErrors.length, errors: userErrors}, 'A,C');
-    // #endregion
-    
-    if (userErrors.length > 0) {
-      console.error('❌ Discount creation errors:', userErrors);
-      throw new Error(`Failed to create discount code: ${JSON.stringify(userErrors)}`);
-    }
-    
-    // Get the actual code from the response (in case Shopify modified it)
-    const createdDiscount = discountData.data?.discountCodeBasicCreate?.codeDiscountNode?.codeDiscount;
-    const actualCode = createdDiscount?.codes?.nodes?.[0]?.code || discountCode;
-    const discountStatus = createdDiscount?.status;
-    const discountId = discountData.data?.discountCodeBasicCreate?.codeDiscountNode?.id;
-    
-    // #region agent log
-    debugLog('webhooks.orders.create.jsx:178', 'Discount extracted from response', {hasDiscount: !!createdDiscount, actualCode, discountStatus, discountId, codesArray: createdDiscount?.codes?.nodes}, 'C,D');
-    // #endregion
-    
-    if (!discountId) {
-      throw new Error('Discount was created but no ID was returned');
-    }
-    
-    console.log(`✅ Discount code created: ${actualCode}`);
-    console.log(`📊 Discount status: ${discountStatus}`);
-    console.log(`🆔 Discount ID: ${discountId}`);
-    
-    // Use the actual code from Shopify response
-    const finalDiscountCode = actualCode;
-    
-    // Tag customer as VIP (only if customer exists, not guest checkout)
-    if (hasCustomer) {
-      await admin.graphql(
-        `#graphql
-        mutation customerUpdate($input: CustomerInput!) {
-          customerUpdate(input: $input) {
-            customer {
-              id
-              tags
-            }
-            userErrors {
-              field
-              message
-            }
-          }
-        }`,
-        {
-          variables: {
-            input: {
-              id: `gid://shopify/Customer/${order.customer.id}`,
-              tags: [CASHBACK_CONFIG.VIP_TAG]
-            }
-          }
-        }
-      );
-    }
     
     // Get shop domain from session
     const shopDomain = session?.shop || order.shop_domain || 'yourstore.myshopify.com';
     
-    // Send email with cashback code
-    await sendCashbackEmail({
-      email: order.email,
-      customerName: order.customer?.first_name || 'Valued Customer',
-      discountCode: finalDiscountCode,
-      cashbackAmount,
-      orderNumber: order.name,
-      shopDomain
-    });
+    // Calculate when to send the cashback email (2 minutes for testing - change back to 30 days later)
+    const orderCreatedAt = new Date(order.created_at);
+    const emailScheduledFor = new Date(orderCreatedAt);
+    emailScheduledFor.setMinutes(emailScheduledFor.getMinutes() + 2); // TODO: Change to 30 days in production
+    // Production: emailScheduledFor.setDate(emailScheduledFor.getDate() + 30);
     
-    console.log(`✅ Cashback processed: ${finalDiscountCode} for $${cashbackAmount}`);
+    // Save to database for delayed processing
+    try {
+      await db.pendingCashback.create({
+        data: {
+          orderId: order.id.toString(),
+          orderName: order.name,
+          customerEmail: order.email,
+          customerName: order.customer?.first_name || 'Valued Customer',
+          cashbackAmount: cashbackAmount,
+          shopDomain: shopDomain,
+          customerId: hasCustomer ? order.customer.id.toString() : null,
+          orderCreatedAt: orderCreatedAt,
+          emailScheduledFor: emailScheduledFor
+        }
+      });
+      
+      console.log(`✅ Cashback scheduled for ${emailScheduledFor.toLocaleDateString()}`);
+      console.log(`📅 Order: ${order.name} | Amount: $${cashbackAmount} | Customer: ${order.email}`);
+      
+      // #region agent log
+      debugLog('webhooks.orders.create.jsx:scheduled', 'Cashback scheduled', {
+        orderName: order.name, 
+        cashbackAmount, 
+        scheduledDate: emailScheduledFor.toISOString()
+      }, 'ALL');
+      // #endregion
+      
+    } catch (dbError) {
+      // Check if this is a duplicate order
+      if (dbError.code === 'P2002') {
+        console.log(`⚠️  Order ${order.name} already scheduled for cashback`);
+        return new Response('OK - Already processed', { status: 200 });
+      }
+      throw dbError;
+    }
+    
+    console.log(`✅ Cashback processing complete for order ${order.name}`);
     
     // #region agent log
-    debugLog('webhooks.orders.create.jsx:230', 'Webhook completed successfully', {finalCode: finalDiscountCode, cashback: cashbackAmount, emailSent: true}, 'ALL');
+    debugLog('webhooks.orders.create.jsx:230', 'Webhook completed successfully', {
+      orderName: order.name, 
+      cashback: cashbackAmount, 
+      scheduled: true
+    }, 'ALL');
     // #endregion
     
     return new Response('OK', { status: 200 });
@@ -281,70 +166,3 @@ export const action = async ({ request }) => {
     });
   }
 };
-
-async function sendCashbackEmail({ email, customerName, discountCode, cashbackAmount, orderNumber, shopDomain }) {
-  // Calculate expiry date
-  const expiryDate = new Date();
-  expiryDate.setDate(expiryDate.getDate() + CASHBACK_CONFIG.CODE_EXPIRY_DAYS);
-  const formattedExpiry = expiryDate.toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
-
-  // Load and populate the email template
-  const emailHtml = getEmailTemplate('meonutrition-cashback', {
-    CUSTOMER_NAME: customerName,
-    CASHBACK_CODE: discountCode,
-    CASHBACK_AMOUNT: `$${cashbackAmount}`,
-    STORE_URL: `https://${shopDomain}`,
-    EXPIRY_DATE: formattedExpiry,
-    ORDER_NUMBER: orderNumber
-  });
-
-  const RESEND_API_KEY = "re_YZV1ECpr_3NYamiQGCEffvuyKQisGTRCo";
-  const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'noreply@plus.meonutrition.com';
-
-  // If Resend API key is configured, use Resend
-  console.log(`📧 Attempting to send email to ${email}...`);
-  if (RESEND_API_KEY) {
-    try {
-      console.log(`📧 Using Resend API with from: ${FROM_EMAIL}`);
-      const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: FROM_EMAIL,
-          to: email,
-          subject: `🎉 You earned $${cashbackAmount} cashback!`,
-          html: emailHtml,
-        }),
-      });
-
-      const result = await response.json();
-      console.log(`📧 Resend API response status: ${response.status}`, JSON.stringify(result));
-
-      if (!response.ok) {
-        throw new Error(`Resend API error: ${JSON.stringify(result)}`);
-      }
-
-      console.log(`✅ Email sent to ${email} - Code: ${discountCode}`);
-      return;
-    } catch (error) {
-      console.error('❌ Failed to send email:', error.message);
-      // Continue - email failure shouldn't block webhook processing
-    }
-  }
-
-  // Fallback: log email details if Resend isn't configured
-  console.log(`📧 Email not sent (configure RESEND_API_KEY) - Code: ${discountCode} to ${email}`);
-}
-
-
-
-
-
-
