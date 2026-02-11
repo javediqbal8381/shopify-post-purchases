@@ -5,6 +5,9 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
 
+// Initialize background cron jobs
+import "./cron.server.js";
+
 export const streamTimeout = 5000;
 
 export default async function handleRequest(

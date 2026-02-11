@@ -1,11 +1,10 @@
-import { json } from "react-router";
 import db from "../db.server";
 import { CASHBACK_CONFIG } from "../config";
 import { getEmailTemplate } from "../email-templates/utils";
 
 /**
  * Cron job endpoint to process delayed cashback emails
- * Triggered daily by Vercel Cron (see vercel.json)
+ * Triggered by node-cron scheduler (see app/cron.server.js)
  * Finds all cashbacks scheduled for today or earlier and sends them
  */
 export const action = async ({ request }) => {
@@ -19,7 +18,7 @@ export const action = async ({ request }) => {
     // Optional: Add secret verification for security
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       console.warn('⚠️  Unauthorized cron request');
-      return json({ error: 'Unauthorized' }, { status: 401 });
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Find all pending cashbacks that are ready to be sent
@@ -39,7 +38,7 @@ export const action = async ({ request }) => {
     console.log(`📦 Found ${pendingCashbacks.length} cashback(s) to process`);
 
     if (pendingCashbacks.length === 0) {
-      return json({ 
+      return Response.json({ 
         success: true, 
         processed: 0,
         message: 'No cashbacks to process'
@@ -247,7 +246,7 @@ export const action = async ({ request }) => {
 
     console.log(`\n✅ Cron job completed: ${results.success} succeeded, ${results.failed} failed`);
 
-    return json({
+    return Response.json({
       success: true,
       processed: pendingCashbacks.length,
       succeeded: results.success,
@@ -257,7 +256,7 @@ export const action = async ({ request }) => {
 
   } catch (error) {
     console.error('❌ Cron job error:', error.message);
-    return json({ 
+    return Response.json({ 
       success: false, 
       error: error.message 
     }, { status: 500 });
