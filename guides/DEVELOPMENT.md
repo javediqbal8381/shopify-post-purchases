@@ -111,6 +111,18 @@ Step 1: Add the Block to Your Theme's Cart
 
 do npm run dev and then press g
 GraphQL Mutations Needed:
+
+1. get 
+query {
+  shopifyFunctions(first: 10) {
+    nodes {
+      id
+      apiType
+      title
+    }
+  }
+}
+
 1. First: Create the Cart Transform (you have this one)
 
 mutation {

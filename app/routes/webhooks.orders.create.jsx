@@ -95,11 +95,10 @@ export const action = async ({ request }) => {
     // Get shop domain from session
     const shopDomain = session?.shop || order.shop_domain || 'yourstore.myshopify.com';
     
-    // Calculate when to send the cashback email (2 minutes for testing - change back to 30 days later)
+    // Calculate when to send the cashback email (30 days from now)
     const orderCreatedAt = new Date(order.created_at);
     const emailScheduledFor = new Date(orderCreatedAt);
-    emailScheduledFor.setMinutes(emailScheduledFor.getMinutes() + 2); // TODO: Change to 30 days in production
-    // Production: emailScheduledFor.setDate(emailScheduledFor.getDate() + 30);
+    emailScheduledFor.setDate(emailScheduledFor.getDate() + 30);
     
     // Save to database for delayed processing
     try {

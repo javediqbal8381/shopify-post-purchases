@@ -88,16 +88,22 @@ export const action = async ({ request }) => {
         const startsAt = new Date().toISOString();
         const endsAt = new Date(Date.now() + CASHBACK_CONFIG.CODE_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-        // Build context for discount (customer-specific or all)
-        let context = {};
+        // Build context based on whether customer exists
+        // For registered customers: restrict to that customer only
+        // For guest checkout: allow anyone (since we can't restrict)
+        let context;
         if (cashback.customerId) {
+          // Try customer-specific first, but have fallback
           context = {
             customers: {
               add: [`gid://shopify/Customer/${cashback.customerId}`]
             }
           };
+          console.log(`🔒 Creating customer-specific code for customer ${cashback.customerId}`);
         } else {
+          // Guest checkout - code must be available to everyone
           context = { all: "ALL" };
+          console.log(`🌐 Creating public code (guest checkout)`);
         }
 
         // Create discount code in Shopify
@@ -155,8 +161,108 @@ export const action = async ({ request }) => {
         const discountData = await discountResponse.json();
         const userErrors = discountData.data?.discountCodeBasicCreate?.userErrors || [];
 
+        // If customer-specific code failed with invalid customer ID, retry with "all customers"
         if (userErrors.length > 0) {
-          throw new Error(`Discount creation failed: ${JSON.stringify(userErrors)}`);
+          const hasInvalidCustomerError = userErrors.some(err => 
+            err.code === 'INVALID' && err.field?.includes('customers')
+          );
+          
+          if (hasInvalidCustomerError && cashback.customerId) {
+            console.warn(`⚠️  Customer ID ${cashback.customerId} invalid, retrying with public code...`);
+            
+            // Retry with "all customers" context
+            const retryResponse = await admin.graphql(
+              `#graphql
+              mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
+                discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
+                  codeDiscountNode {
+                    id
+                    codeDiscount {
+                      ... on DiscountCodeBasic {
+                        title
+                        status
+                        codes(first: 1) {
+                          nodes {
+                            code
+                          }
+                        }
+                      }
+                    }
+                  }
+                  userErrors {
+                    field
+                    message
+                    code
+                  }
+                }
+              }`,
+              {
+                variables: {
+                  basicCodeDiscount: {
+                    title: `Cashback ${cashback.cashbackAmount} - Order ${cashback.orderName}`,
+                    code: discountCode,
+                    startsAt,
+                    endsAt,
+                    context: { all: "ALL" }, // Use public code as fallback
+                    customerGets: {
+                      value: {
+                        discountAmount: {
+                          amount: cashback.cashbackAmount,
+                          appliesOnEachItem: false
+                        }
+                      },
+                      items: {
+                        all: true
+                      }
+                    },
+                    usageLimit: 1,
+                    appliesOncePerCustomer: true
+                  }
+                }
+              }
+            );
+            
+            const retryData = await retryResponse.json();
+            const retryErrors = retryData.data?.discountCodeBasicCreate?.userErrors || [];
+            
+            if (retryErrors.length > 0) {
+              throw new Error(`Discount creation failed (retry): ${JSON.stringify(retryErrors)}`);
+            }
+            
+            const createdDiscount = retryData.data?.discountCodeBasicCreate?.codeDiscountNode?.codeDiscount;
+            const actualCode = createdDiscount?.codes?.nodes?.[0]?.code || discountCode;
+            console.log(`✅ Discount code created (public fallback): ${actualCode}`);
+            
+            // Tag customer as VIP (if customer exists) - skip since customer ID was invalid
+            // Send email and mark as complete
+            await sendCashbackEmail({
+              email: cashback.customerEmail,
+              customerName: cashback.customerName,
+              discountCode: actualCode,
+              cashbackAmount: cashback.cashbackAmount,
+              orderNumber: cashback.orderName,
+              shopDomain: cashback.shopDomain
+            });
+            
+            console.log(`📧 Email sent to ${cashback.customerEmail}`);
+            
+            await db.pendingCashback.update({
+              where: { id: cashback.id },
+              data: {
+                emailSent: true,
+                emailSentAt: new Date(),
+                discountCode: actualCode,
+                errorMessage: null
+              }
+            });
+            
+            console.log(`✅ Cashback processed successfully for order ${cashback.orderName} (fallback)`);
+            results.success++;
+            continue; // Skip to next cashback
+          } else {
+            // Different error, throw it
+            throw new Error(`Discount creation failed: ${JSON.stringify(userErrors)}`);
+          }
         }
 
         const createdDiscount = discountData.data?.discountCodeBasicCreate?.codeDiscountNode?.codeDiscount;
