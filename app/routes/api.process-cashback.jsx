@@ -99,11 +99,8 @@ export const action = async ({ request }) => {
               add: [`gid://shopify/Customer/${cashback.customerId}`]
             }
           };
-          console.log(`🔒 Creating customer-specific code for customer ${cashback.customerId}`);
         } else {
-          // Guest checkout - code must be available to everyone
           context = { all: "ALL" };
-          console.log(`🌐 Creating public code (guest checkout)`);
         }
 
         // Create discount code in Shopify
