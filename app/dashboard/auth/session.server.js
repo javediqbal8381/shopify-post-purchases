@@ -62,7 +62,8 @@ function buildCookieHeader(name, value, maxAge) {
     "SameSite=Lax",
     `Max-Age=${maxAge}`,
   ];
-  if (process.env.NODE_ENV === "production") parts.push("Secure");
+  const appUrl = process.env.SHOPIFY_APP_URL || "";
+  if (appUrl.startsWith("https://")) parts.push("Secure");
   return parts.join("; ");
 }
 
