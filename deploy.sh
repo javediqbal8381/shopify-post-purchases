@@ -20,7 +20,7 @@ echo "▶️  Starting new container..."
 sudo docker run -d \
   --name post-purchases-flow \
   --restart unless-stopped \
-  -p 80:3000 \
+  -p 3000:3000 \
   --env-file .env \
   post-purchases-flow
 
