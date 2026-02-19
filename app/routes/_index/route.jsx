@@ -1,54 +1,26 @@
-import { redirect, Form, useLoaderData } from "react-router";
-import { login } from "../../shopify.server";
-import styles from "./styles.module.css";
+/**
+ * Root Route — /
+ *
+ * Redirects visitors based on auth state:
+ *  - Logged in  → /dashboard
+ *  - Logged out → /signin
+ *
+ * Also still handles the Shopify ?shop= query param for
+ * the embedded admin flow (existing behavior).
+ */
+
+import { redirect } from "react-router";
+import { getDashboardUser } from "../../dashboard/auth/session.server";
 
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
 
+  // Shopify embedded app flow — keep existing behavior
   if (url.searchParams.get("shop")) {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  return { showForm: Boolean(login) };
+  // Dashboard auth check
+  const user = getDashboardUser(request);
+  throw redirect(user ? "/dashboard" : "/signin");
 };
-
-export default function App() {
-  const { showForm } = useLoaderData();
-
-  return (
-    <div className={styles.index}>
-      <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about checkou++</h1>
-        <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
-        </p>
-        {showForm && (
-          <Form className={styles.form} method="post" action="/auth/login">
-            <label className={styles.label}>
-              <span>Shop domain</span>
-              <input className={styles.input} type="text" name="shop" />
-              <span>e.g: my-shop-domain.myshopify.com</span>
-            </label>
-            <button className={styles.button} type="submit">
-              Log in
-            </button>
-          </Form>
-        )}
-        <ul className={styles.list}>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-        </ul>
-      </div>
-    </div>
-  );
-}

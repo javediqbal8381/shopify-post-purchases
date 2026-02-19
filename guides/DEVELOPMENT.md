@@ -123,11 +123,11 @@ query {
   }
 }
 
-1. First: Create the Cart Transform (you have this one)
+1. First: Create the Cart Transform (the id copied from the ist one)
 
 mutation {
   cartTransformCreate(
-    functionId: "019bdfda-bd41-7a6a-85b4-f145ad08c712"
+    functionId: "[ID_FROM_FIRST_MUTATION]"
   ) {
     cartTransform {
       id
@@ -147,7 +147,7 @@ After creating it, you need to activate it:
 
 mutation {
   cartTransformActivate(
-    cartTransformId: "gid://shopify/CartTransform/[ID_FROM_FIRST_MUTATION]"
+    cartTransformId: "gid://shopify/CartTransform/[ID_FROM_2ND_MUTATION]"
   ) {
     cartTransform {
       id

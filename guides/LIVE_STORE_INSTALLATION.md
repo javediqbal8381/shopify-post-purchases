@@ -44,17 +44,21 @@ create a hidden product
 2. Fill in:
 * Title: Order Protection
 * Description: Protection for your order with cashback rewards
-* Price: $25.00 (or whatever you want as the insurance fee)
+* Price: $00.00
 * SKU: (leave empty)
 * Uncheck: "Charge tax on this product"
-* Uncheck: "This is a physical product" (or set "Requires shipping" to NO)
 * Product type: Service
 * Vendor: Store
 * Tags: order-protection, hidden
-1. IMPORTANT: Make sure Status is set to Active (not Draft)
-2. IMPORTANT: Make sure it's published to "Online Store" sales channel
+* Catagory should be uncatagorized
+* Add varient 
+   put title as "Title" and this as "Protect against loss, theft and damage (ONW76)"
+   make this a physical product by clicking the Varient
+3. IMPORTANT: Make sure Status is set to Active (not Draft)
+4. IMPORTANT: Make sure it's published to "Online Store" sales channel
 * Scroll to "Inventory" section
 * Check: ☑ "Continue selling when out of stock"
+
 1. Click Save
 
 ---

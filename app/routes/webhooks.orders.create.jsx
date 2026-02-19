@@ -2,59 +2,36 @@ import { authenticate } from "../shopify.server";
 import { CASHBACK_CONFIG } from "../config";
 import db from "../db.server";
 
-// Webhook handler for order creation
-// Schedules delayed cashback rewards (30 days) when customers opt-in to order protection
+// Webhook: orders/create
+// 1. Auto-fulfills Checkout+ product (delayed to allow Shopify to create fulfillment orders)
+// 2. Schedules delayed cashback rewards (30 days) for order protection customers
 
 export const action = async ({ request }) => {
-  console.log('🔔 Webhook received: orders/create');
-  
-  // #region agent log
-  const debugLog = (loc, msg, data, hyp) => fetch('http://127.0.0.1:7242/ingest/b9111116-a737-47d1-9fc6-489a44e45604',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:loc,message:msg,data,timestamp:Date.now(),sessionId:'debug-session',hypothesisId:hyp})}).catch(()=>{});
-  // #endregion
-  
   try {
-    // Read the body first to get order data
     const bodyText = await request.clone().text();
     const order = JSON.parse(bodyText);
-    
-    // #region agent log
-    debugLog('webhooks.orders.create.jsx:14', 'Webhook entry', {orderName: order.name, email: order.email, hasCustomer: !!order.customer}, 'A,B,E');
-    // #endregion
-    
-    // Try to authenticate, but fallback if it fails
-    let admin, session;
-    
+    const shopDomainFromHeader = request.headers.get('x-shopify-shop-domain');
+
+    // Authenticate webhook (with fallback for dev)
+    let admin, session, shopDomain;
+
     try {
       const authResult = await authenticate.webhook(request);
       admin = authResult.admin;
       session = authResult.session;
-      // #region agent log
-      debugLog('webhooks.orders.create.jsx:25', 'Auth success - primary', {hasAdmin: !!admin, hasSession: !!session, shop: session?.shop}, 'B');
-      // #endregion
     } catch (authError) {
-      console.warn('⚠️  Using fallback authentication for development');
-      // #region agent log
-      debugLog('webhooks.orders.create.jsx:35', 'Auth fallback triggered', {authError: authError.message, shopDomain: order.shop_domain}, 'B');
-      // #endregion
-      
-      // Fallback: create admin client manually using stored session
-      const shopDomain = order.shop_domain || 'dev-store2-8.myshopify.com';
+      // Fallback: use stored session for the shop from webhook header
+      shopDomain = shopDomainFromHeader || 'dev-store2-8.myshopify.com';
       const shopifyServer = await import("../shopify.server");
       const sessions = await shopifyServer.sessionStorage.findSessionsByShop(shopDomain);
-      const activeSession = sessions.find(s => s.isOnline === false) || sessions[0];
-      
-      if (!activeSession) {
-        throw new Error('No active session found - app may not be installed');
-      }
-      
-      // #region agent log
-      debugLog('webhooks.orders.create.jsx:48', 'Fallback auth found session', {sessionShop: activeSession.shop, hasToken: !!activeSession.accessToken}, 'B');
-      // #endregion
-      
+      const activeSession = sessions.find(s => !s.isOnline) || sessions[0];
+
+      if (!activeSession) throw new Error('No active session found');
+
       session = activeSession;
       admin = {
         graphql: async (query, options) => {
-          const response = await fetch(`https://${shopDomain}/admin/api/2025-10/graphql.json`, {
+          return fetch(`https://${shopDomain}/admin/api/2025-10/graphql.json`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -62,45 +39,123 @@ export const action = async ({ request }) => {
             },
             body: JSON.stringify({ query, variables: options?.variables }),
           });
-          return response;
         }
       };
     }
-    
-    console.log(`📦 Processing order ${order.name} for ${order.email}`);
-    
-    // Check if protection was enabled (via attributes OR product)
+
+    if (!shopDomain) {
+      shopDomain = shopDomainFromHeader || session?.shop || 'yourstore.myshopify.com';
+    }
+
+    console.log(`📦 Order ${order.name} | ${order.email} | Shop: ${shopDomain}`);
+
+    // Check if order has protection enabled
     const protectionAttr = order.note_attributes?.find(attr => attr.name === '_protection_enabled');
     const hasProtectionProduct = order.line_items?.some(item => {
       const title = (item.title || item.name || '').toLowerCase();
       return title.includes('order protection') || title.includes('protection') || title.includes('checkout+');
     });
     const hasProtection = protectionAttr?.value === 'true' || hasProtectionProduct;
-    
+
     if (!hasProtection) {
-      console.log('Protection not enabled, skipping cashback');
+      console.log('ℹ️  No protection, skipping');
       return new Response('OK', { status: 200 });
     }
-    
-    console.log('✅ Protection enabled, processing cashback...');
-    
-    // Get cashback amount (from attributes or calculate from order total)
-    const cashbackAttr = order.note_attributes?.find(attr => attr.name === '_cashback_amount');
-    const cashbackAmount = cashbackAttr?.value || 
+
+    // Auto-fulfill Checkout+ after delay (Shopify needs time to create fulfillment orders)
+    if (hasProtectionProduct) {
+      setTimeout(async () => {
+        try {
+          const orderQuery = await admin.graphql(
+            `#graphql
+            query getOrder($id: ID!) {
+              order(id: $id) {
+                id
+                name
+                fulfillmentOrders(first: 10) {
+                  nodes {
+                    id
+                    status
+                    lineItems(first: 50) {
+                      nodes {
+                        id
+                        remainingQuantity
+                        lineItem {
+                          id
+                          title
+                          product { handle }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }`,
+            { variables: { id: `gid://shopify/Order/${order.id}` } }
+          );
+
+          const orderData = await orderQuery.json();
+          const fulfillmentOrders = orderData.data?.order?.fulfillmentOrders?.nodes || [];
+
+          for (const fo of fulfillmentOrders) {
+            // Find unfulfilled Checkout+ items in this fulfillment order
+            const protectionItems = fo.lineItems.nodes.filter(item => {
+              const handle = item.lineItem.product?.handle || '';
+              const title = item.lineItem.title?.toLowerCase() || '';
+              return (handle.includes('order-protection') || title.includes('checkout+')) &&
+                     item.remainingQuantity > 0;
+            });
+
+            if (protectionItems.length > 0 && (fo.status === 'OPEN' || fo.status === 'IN_PROGRESS')) {
+              const res = await admin.graphql(
+                `#graphql
+                mutation fulfillmentCreateV2($fulfillment: FulfillmentV2Input!) {
+                  fulfillmentCreateV2(fulfillment: $fulfillment) {
+                    fulfillment { id }
+                    userErrors { field message }
+                  }
+                }`,
+                {
+                  variables: {
+                    fulfillment: {
+                      lineItemsByFulfillmentOrder: [{
+                        fulfillmentOrderId: fo.id,
+                        fulfillmentOrderLineItems: protectionItems.map(item => ({
+                          id: item.id,
+                          quantity: item.remainingQuantity
+                        }))
+                      }],
+                      notifyCustomer: false
+                    }
+                  }
+                }
+              );
+
+              const data = await res.json();
+              const errors = data.data?.fulfillmentCreateV2?.userErrors || [];
+
+              if (errors.length > 0) {
+                console.error(`❌ Auto-fulfill failed for ${order.name}:`, JSON.stringify(errors));
+              } else {
+                console.log(`✅ Checkout+ auto-fulfilled for ${order.name}`);
+              }
+              break;
+            }
+          }
+        } catch (err) {
+          console.log(`⚠️  Auto-fulfillment error for ${order.name}:`, err.message);
+        }
+      }, 5000); // 5s delay for fulfillment orders to be created
+    }
+
+    // Schedule cashback (30 days from now)
+    const cashbackAmount = order.note_attributes?.find(a => a.name === '_cashback_amount')?.value ||
       (parseFloat(order.total_price) * CASHBACK_CONFIG.CASHBACK_PERCENT / 100).toFixed(2);
-    
-    // Handle guest checkout (customer might be null)
-    const hasCustomer = order.customer && order.customer.id;
-    
-    // Get shop domain from session
-    const shopDomain = session?.shop || order.shop_domain || 'yourstore.myshopify.com';
-    
-    // Calculate when to send the cashback email (30 days from now)
+
     const orderCreatedAt = new Date(order.created_at);
     const emailScheduledFor = new Date(orderCreatedAt);
-    emailScheduledFor.setDate(emailScheduledFor.getDate() + 30);
-    
-    // Save to database for delayed processing
+    emailScheduledFor.setMinutes(emailScheduledFor.getMinutes() + CASHBACK_CONFIG.CASHBACK_DELAY_MINUTES);
+
     try {
       await db.pendingCashback.create({
         data: {
@@ -108,58 +163,27 @@ export const action = async ({ request }) => {
           orderName: order.name,
           customerEmail: order.email,
           customerName: order.customer?.first_name || 'Valued Customer',
-          cashbackAmount: cashbackAmount,
-          shopDomain: shopDomain,
-          customerId: hasCustomer ? order.customer.id.toString() : null,
-          orderCreatedAt: orderCreatedAt,
-          emailScheduledFor: emailScheduledFor
+          cashbackAmount,
+          shopDomain,
+          customerId: order.customer?.id?.toString() || null,
+          orderCreatedAt,
+          emailScheduledFor
         }
       });
-      
-      console.log(`✅ Cashback scheduled for ${emailScheduledFor.toLocaleDateString()}`);
-      console.log(`📅 Order: ${order.name} | Amount: $${cashbackAmount} | Customer: ${order.email}`);
-      
-      // #region agent log
-      debugLog('webhooks.orders.create.jsx:scheduled', 'Cashback scheduled', {
-        orderName: order.name, 
-        cashbackAmount, 
-        scheduledDate: emailScheduledFor.toISOString()
-      }, 'ALL');
-      // #endregion
-      
+      console.log(`✅ Cashback $${cashbackAmount} scheduled for ${order.name} (${emailScheduledFor.toLocaleDateString()})`);
     } catch (dbError) {
-      // Check if this is a duplicate order
       if (dbError.code === 'P2002') {
-        console.log(`⚠️  Order ${order.name} already scheduled for cashback`);
-        return new Response('OK - Already processed', { status: 200 });
+        console.log(`ℹ️  ${order.name} already scheduled`);
+        return new Response('OK', { status: 200 });
       }
       throw dbError;
     }
-    
-    console.log(`✅ Cashback processing complete for order ${order.name}`);
-    
-    // #region agent log
-    debugLog('webhooks.orders.create.jsx:230', 'Webhook completed successfully', {
-      orderName: order.name, 
-      cashback: cashbackAmount, 
-      scheduled: true
-    }, 'ALL');
-    // #endregion
-    
+
     return new Response('OK', { status: 200 });
-    
+
   } catch (error) {
     console.error('❌ Webhook error:', error.message || error);
-    if (error.stack) console.error(error.stack);
-    
-    // #region agent log
-    debugLog('webhooks.orders.create.jsx:238', 'Webhook error caught', {errorMessage: error.message, errorStack: error.stack?.substring(0, 200)}, 'ALL');
-    // #endregion
-    
-    // Return 200 so Shopify doesn't retry
-    return new Response(JSON.stringify({ 
-      error: error?.message || String(error)
-    }), { 
+    return new Response(JSON.stringify({ error: error?.message || String(error) }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });

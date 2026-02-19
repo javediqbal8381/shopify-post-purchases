@@ -156,7 +156,20 @@ export const action = async ({ request }) => {
         );
 
         const discountData = await discountResponse.json();
-        const userErrors = discountData.data?.discountCodeBasicCreate?.userErrors || [];
+        
+        // Log full response for debugging
+        console.log('📋 Discount API response:', JSON.stringify(discountData, null, 2));
+
+        // Check for top-level GraphQL errors (auth issues, malformed query, etc.)
+        if (discountData.errors) {
+          throw new Error(`GraphQL error: ${JSON.stringify(discountData.errors)}`);
+        }
+
+        if (!discountData.data?.discountCodeBasicCreate) {
+          throw new Error(`No discount data in response: ${JSON.stringify(discountData)}`);
+        }
+
+        const userErrors = discountData.data.discountCodeBasicCreate.userErrors || [];
 
         // If customer-specific code failed with invalid customer ID, retry with "all customers"
         if (userErrors.length > 0) {
@@ -220,14 +233,27 @@ export const action = async ({ request }) => {
             );
             
             const retryData = await retryResponse.json();
+            console.log('📋 Retry discount API response:', JSON.stringify(retryData, null, 2));
+
+            if (retryData.errors) {
+              throw new Error(`GraphQL error (retry): ${JSON.stringify(retryData.errors)}`);
+            }
+
             const retryErrors = retryData.data?.discountCodeBasicCreate?.userErrors || [];
             
             if (retryErrors.length > 0) {
               throw new Error(`Discount creation failed (retry): ${JSON.stringify(retryErrors)}`);
             }
             
-            const createdDiscount = retryData.data?.discountCodeBasicCreate?.codeDiscountNode?.codeDiscount;
-            const actualCode = createdDiscount?.codes?.nodes?.[0]?.code || discountCode;
+            const retryDiscount = retryData.data?.discountCodeBasicCreate?.codeDiscountNode;
+            if (!retryDiscount) {
+              throw new Error('Discount code was not created (no codeDiscountNode in retry response)');
+            }
+
+            const actualCode = retryDiscount.codeDiscount?.codes?.nodes?.[0]?.code;
+            if (!actualCode) {
+              throw new Error('Discount created but no code returned in retry response');
+            }
             console.log(`✅ Discount code created (public fallback): ${actualCode}`);
             
             // Tag customer as VIP (if customer exists) - skip since customer ID was invalid
@@ -262,10 +288,17 @@ export const action = async ({ request }) => {
           }
         }
 
-        const createdDiscount = discountData.data?.discountCodeBasicCreate?.codeDiscountNode?.codeDiscount;
-        const actualCode = createdDiscount?.codes?.nodes?.[0]?.code || discountCode;
+        const codeDiscountNode = discountData.data.discountCodeBasicCreate.codeDiscountNode;
+        if (!codeDiscountNode) {
+          throw new Error('Discount code was not created (no codeDiscountNode in response)');
+        }
+        
+        const actualCode = codeDiscountNode.codeDiscount?.codes?.nodes?.[0]?.code;
+        if (!actualCode) {
+          throw new Error('Discount created but no code returned in response');
+        }
 
-        console.log(`✅ Discount code created: ${actualCode}`);
+        console.log(`✅ Discount code created: ${actualCode} (ID: ${codeDiscountNode.id})`);
 
         // Tag customer as VIP (if customer exists)
         if (cashback.customerId) {

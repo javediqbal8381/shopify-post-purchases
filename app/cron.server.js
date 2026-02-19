@@ -9,6 +9,16 @@ import cron from 'node-cron';
  * - No external cron setup needed!
  */
 
+// Prevent duplicate cron instances (Vite HMR reloads entry.server.jsx multiple times)
+if (globalThis.__cronInitialized) {
+  // Already running, skip
+} else {
+  globalThis.__cronInitialized = true;
+  initCron();
+}
+
+function initCron() {
+
 // Auto-detect the correct port from environment or use common dev port
 const PORT = process.env.PORT || 59060;
 const CASHBACK_ENDPOINT = process.env.CASHBACK_ENDPOINT || `http://localhost:${PORT}/api/process-cashback`;
@@ -95,5 +105,7 @@ console.log('✅ Cron job active: Daily at 10:00 AM (PRODUCTION)');
 // Every 6 hours
 // cron.schedule('0 */6 * * *', async () => { ... });
 
+
+} // end initCron
 
 export default cron;

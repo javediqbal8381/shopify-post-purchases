@@ -17,5 +17,10 @@ export const CASHBACK_CONFIG = {
   
   // Code expiry days
   CODE_EXPIRY_DAYS: 365,
+
+  // Delay before sending cashback email (in minutes)
+  // Set via env: CASHBACK_DELAY_MINUTES=43200 for 30 days (30*24*60)
+  // Use small values for testing: CASHBACK_DELAY_MINUTES=2
+  CASHBACK_DELAY_MINUTES: parseInt(process.env.CASHBACK_DELAY_MINUTES || '43200', 10),
 };
 

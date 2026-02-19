@@ -57,3 +57,20 @@ model PendingCashback {
   @@index([emailScheduledFor, emailSent])
   @@index([emailSent])
 }
+
+// ─── Dashboard Auth ──────────────────────────────────────────
+// Stores merchant accounts for the standalone dashboard portal.
+// Each user can manage multiple Shopify stores.
+
+model DashboardUser {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  name             String
+  shopDomains      String[]
+  activeShopDomain String
+  passwordHash     String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([activeShopDomain])
+}

@@ -64,44 +64,27 @@ export function cartTransformRun(input) {
   // Calculate protection fee (4% of subtotal)
   const protectionFee = subtotal * (FEE_PERCENTAGE / 100); 
 
-  // Calculate the price adjustment needed
-  // Since we can't use lineUpdate (Shopify Plus only), we use lineExpand
-  // The product should have a base price set, and we adjust it here
-  const currentPrice = parseFloat(protectionLine.cost.amountPerQuantity.amount);
-  const priceAdjustment = protectionFee - currentPrice;
+  console.error(`[Cart Transform] Subtotal: $${subtotal.toFixed(2)}, Protection Fee (4%): $${protectionFee.toFixed(2)}`);
 
-  console.error(`[Cart Transform] Current price: $${currentPrice.toFixed(2)}, Target: $${protectionFee.toFixed(2)}, Adjustment: $${priceAdjustment.toFixed(2)}`);
-
-  // If the price is already correct (within 1 cent), don't adjust
-  if (Math.abs(priceAdjustment) < 0.01) {
-    console.error(`[Cart Transform] Price already correct, no adjustment needed`);
-    return NO_CHANGES;
-  }
-
-  // Use lineExpand to adjust the price
-  const expandOperation = {
-    lineExpand: {
+  // Use lineUpdate (Shopify Plus feature) to set dynamic price and clean display
+  // This will show only "Checkout+" with price - NO "Hide items" section
+  const updateOperation = {
+    lineUpdate: {
       cartLineId: protectionLine.id,
-      expandedCartItems: [
-        {
-          merchandiseId: protectionLine.merchandise.id,
-          quantity: 1,
-          price: {
-            adjustment: {
-              fixedPricePerUnit: {
-                amount: protectionFee.toFixed(2),
-              },
-            },
+      title: "Checkout+",
+      price: {
+        adjustment: {
+          fixedPricePerUnit: {
+            amount: protectionFee.toFixed(2),
           },
         },
-      ],
+      },
     },
   };
 
-  console.error(`[Cart Transform] Subtotal: $${subtotal.toFixed(2)}, Protection Fee (4%): $${protectionFee.toFixed(2)}`);
-  console.error(`[Cart Transform] Returning lineExpand operation`);
+  console.error(`[Cart Transform] Using lineUpdate with dynamic price: $${protectionFee.toFixed(2)}`);
 
   return {
-    operations: [expandOperation],
+    operations: [updateOperation],
   };
 };
