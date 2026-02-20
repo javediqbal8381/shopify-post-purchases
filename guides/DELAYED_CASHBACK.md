@@ -163,10 +163,10 @@ You can manually trigger the cron job to test it:
 
 ```bash
 # Using curl
-curl -X POST http://app.interactivecheckout.com/api/process-cashback
+curl -X POST https://app.interactivecheckout.com/api/process-cashback
 
 # Or visit in browser (GET request also works)
-http://app.interactivecheckout.com/api/process-cashback
+https://app.interactivecheckout.com/api/process-cashback
 ```
 
 **To test with actual data:**
@@ -276,7 +276,7 @@ Protect the cron endpoint with a secret:
 ```bash
 curl -X POST \
   -H "Authorization: Bearer your-random-secret-here" \
-  http://app.interactivecheckout.com/api/process-cashback
+  https://app.interactivecheckout.com/api/process-cashback
 ```
 
 ### Change Delay for Specific Orders

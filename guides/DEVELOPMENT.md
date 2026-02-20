@@ -80,7 +80,7 @@ add webhook in shopify admin
 * Click "Create webhook"
 * Event: Select Order creation
 * Format: JSON
-* URL: http://app.interactivecheckout.com/webhooks/orders/create
+* URL: https://app.interactivecheckout.com/webhooks/orders/create
 * API version: 2026-01 (or latest)
 * Click Save
 
@@ -248,7 +248,7 @@ You can test orders using the **Bogus Test gateway**, or by activating test mode
    * Click "Create webhook"
    * **Event:** Select Order creation
    * **Format:** JSON
-   * **URL:** [http://app.interactivecheckout.com/webhooks/orders/create](http://app.interactivecheckout.com/webhooks/orders/create)
+   * **URL:** [https://app.interactivecheckout.com/webhooks/orders/create](https://app.interactivecheckout.com/webhooks/orders/create)
    * **API version:** 2026-01 (or latest)
    * Click **Save**
 
