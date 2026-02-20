@@ -42,7 +42,7 @@
 create a hidden product
 1. Go to: Products → Add product
 2. Fill in:
-* Title: Order Protection
+* Title: Checkout+
 * Description: Protection for your order with cashback rewards
 * Price: $00.00
 * SKU: (leave empty)

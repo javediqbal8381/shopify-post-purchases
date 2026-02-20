@@ -58,7 +58,6 @@ export const action = async ({ request }) => {
     const hasProtection = protectionAttr?.value === 'true' || hasProtectionProduct;
 
     if (!hasProtection) {
-      console.log('ℹ️  No protection, skipping');
       return new Response('OK', { status: 200 });
     }
 
@@ -98,11 +97,10 @@ export const action = async ({ request }) => {
           const fulfillmentOrders = orderData.data?.order?.fulfillmentOrders?.nodes || [];
 
           for (const fo of fulfillmentOrders) {
-            // Find unfulfilled Checkout+ items in this fulfillment order
             const protectionItems = fo.lineItems.nodes.filter(item => {
               const handle = item.lineItem.product?.handle || '';
               const title = item.lineItem.title?.toLowerCase() || '';
-              return (handle.includes('order-protection') || title.includes('checkout+')) &&
+              return (handle.includes('order-protection') || title.includes('checkout+') || title.includes('order protection')) &&
                      item.remainingQuantity > 0;
             });
 
@@ -111,7 +109,7 @@ export const action = async ({ request }) => {
                 `#graphql
                 mutation fulfillmentCreateV2($fulfillment: FulfillmentV2Input!) {
                   fulfillmentCreateV2(fulfillment: $fulfillment) {
-                    fulfillment { id }
+                    fulfillment { id status }
                     userErrors { field message }
                   }
                 }`,
@@ -133,19 +131,21 @@ export const action = async ({ request }) => {
 
               const data = await res.json();
               const errors = data.data?.fulfillmentCreateV2?.userErrors || [];
+              const fulfillment = data.data?.fulfillmentCreateV2?.fulfillment;
 
               if (errors.length > 0) {
                 console.error(`❌ Auto-fulfill failed for ${order.name}:`, JSON.stringify(errors));
               } else {
-                console.log(`✅ Checkout+ auto-fulfilled for ${order.name}`);
+                console.log(`✅ Checkout+ auto-fulfilled for ${order.name} (fulfillment: ${fulfillment?.id}, status: ${fulfillment?.status})`);
               }
               break;
             }
           }
+
         } catch (err) {
-          console.log(`⚠️  Auto-fulfillment error for ${order.name}:`, err.message);
+          console.error(`❌ Auto-fulfillment error for ${order.name}:`, err.message);
         }
-      }, 5000); // 5s delay for fulfillment orders to be created
+      }, 10000);
     }
 
     // Schedule cashback (30 days from now)
@@ -170,10 +170,9 @@ export const action = async ({ request }) => {
           emailScheduledFor
         }
       });
-      console.log(`✅ Cashback $${cashbackAmount} scheduled for ${order.name} (${emailScheduledFor.toLocaleDateString()})`);
+      console.log(`✅ Cashback $${cashbackAmount} scheduled for ${order.name}`);
     } catch (dbError) {
       if (dbError.code === 'P2002') {
-        console.log(`ℹ️  ${order.name} already scheduled`);
         return new Response('OK', { status: 200 });
       }
       throw dbError;
