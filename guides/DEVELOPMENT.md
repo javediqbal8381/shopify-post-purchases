@@ -1,17 +1,8 @@
 Shopify anwards+ project
 
 Tasks Todo 
-make the discount code expire after usage so customer unable to use again
 
-deploy backend in digital ocean droplet
-
-Create a dashboard for the app and there will show the analytics.
-cashback and insurence %age shold be like as onwards
-create a dashboard to show all the details.
 when click on the app in shopify apps section so it shoulkd go to dashboard
-send the cashback email after 30 days.
-ask markus after few days if the onwards installed the checkout+ on the non plus store
-
 
 example site from where i get the design and flow idea
 https://kinfield.com/
@@ -89,7 +80,7 @@ add webhook in shopify admin
 * Click "Create webhook"
 * Event: Select Order creation
 * Format: JSON
-* URL: https://shopify-post-purchases.vercel.app/webhooks/orders/create
+* URL: http://app.interactivecheckout.com/webhooks/orders/create
 * API version: 2026-01 (or latest)
 * Click Save
 
@@ -257,7 +248,7 @@ You can test orders using the **Bogus Test gateway**, or by activating test mode
    * Click "Create webhook"
    * **Event:** Select Order creation
    * **Format:** JSON
-   * **URL:** [https://shopify-post-purchases.vercel.app/webhooks/orders/create](https://shopify-post-purchases.vercel.app/webhooks/orders/create)
+   * **URL:** [http://app.interactivecheckout.com/webhooks/orders/create](http://app.interactivecheckout.com/webhooks/orders/create)
    * **API version:** 2026-01 (or latest)
    * Click **Save**
 

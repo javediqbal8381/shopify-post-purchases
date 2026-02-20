@@ -163,10 +163,10 @@ You can manually trigger the cron job to test it:
 
 ```bash
 # Using curl
-curl -X POST https://shopify-post-purchases.vercel.app/api/process-cashback
+curl -X POST http://app.interactivecheckout.com/api/process-cashback
 
 # Or visit in browser (GET request also works)
-https://shopify-post-purchases.vercel.app/api/process-cashback
+http://app.interactivecheckout.com/api/process-cashback
 ```
 
 **To test with actual data:**
@@ -276,7 +276,7 @@ Protect the cron endpoint with a secret:
 ```bash
 curl -X POST \
   -H "Authorization: Bearer your-random-secret-here" \
-  https://shopify-post-purchases.vercel.app/api/process-cashback
+  http://app.interactivecheckout.com/api/process-cashback
 ```
 
 ### Change Delay for Specific Orders

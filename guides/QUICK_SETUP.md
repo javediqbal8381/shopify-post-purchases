@@ -93,7 +93,7 @@ WHERE "orderName" = '#1234'; -- Replace with your test order
 
 **Method 2: Call the endpoint**
 ```bash
-curl -X POST https://shopify-post-purchases.vercel.app/api/process-cashback
+curl -X POST http://app.interactivecheckout.com/api/process-cashback
 ```
 
 **Expected result:**

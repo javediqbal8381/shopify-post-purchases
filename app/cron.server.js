@@ -20,7 +20,7 @@ if (globalThis.__cronInitialized) {
 function initCron() {
 
 // Auto-detect the correct port from environment or use common dev port
-const PORT = process.env.PORT || 59060;
+const PORT = process.env.PORT || 3000;
 const CASHBACK_ENDPOINT = process.env.CASHBACK_ENDPOINT || `http://localhost:${PORT}/api/process-cashback`;
 
 console.log('🕐 Initializing cashback cron jobs...');

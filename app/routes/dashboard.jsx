@@ -27,17 +27,20 @@ export const loader = async ({ request }) => {
 const styles = {
   layout: {
     display: "flex",
-    minHeight: "100vh",
+    height: "100vh",
+    overflow: "hidden",
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
   },
   sidebar: {
     width: "240px",
     background: "#111827",
     color: "#fff",
-    padding: "24px 0",
+    padding: "16px 0",
     display: "flex",
     flexDirection: "column",
     flexShrink: 0,
+    height: "100vh",
+    boxSizing: "border-box",
   },
   brand: {
     padding: "0 20px 24px",
@@ -61,6 +64,7 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     gap: "2px",
+    overflowY: "auto",
   },
   navLink: {
     display: "flex",
@@ -78,9 +82,9 @@ const styles = {
     color: "#fff",
   },
   sidebarFooter: {
-    padding: "16px 12px 0",
+    padding: "12px 12px",
     borderTop: "1px solid rgba(255,255,255,0.08)",
-    marginTop: "auto",
+    flexShrink: 0,
   },
   logoutBtn: {
     display: "flex",
@@ -102,6 +106,7 @@ const styles = {
     background: "#f9fafb",
     display: "flex",
     flexDirection: "column",
+    overflowY: "auto",
   },
   topbar: {
     background: "#fff",

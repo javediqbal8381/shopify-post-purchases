@@ -213,4 +213,198 @@ sudo docker start post-purchases-flow
 
 ---
 
+## First-Time Domain & SSL Setup
+
+If you're setting up a domain and HTTPS for the first time on a fresh server, follow these steps.
+
+### 1. Point Your Domain to the Server
+
+Go to your domain registrar (Namecheap, GoDaddy, Cloudflare, etc.) and add an **A record**:
+
+| Type | Name | Value |
+|------|------|-------|
+| A | `app` (or `@` for root domain) | `YOUR_SERVER_IP` |
+
+Wait a few minutes for DNS to propagate. Verify with:
+
+```bash
+ping app.yourdomain.com
+```
+
+### 2. Install Nginx
+
+```bash
+sudo apt update
+sudo apt install nginx -y
+```
+
+### 3. Create Nginx Config
+
+```bash
+sudo nano /etc/nginx/sites-available/post-purchases-flow
+```
+
+Paste this (replace `app.yourdomain.com` with your actual domain):
+
+```nginx
+server {
+    listen 80;
+    server_name app.yourdomain.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+Save with `Ctrl+X`, then `Y`, then `Enter`.
+
+### 4. Enable the Site
+
+```bash
+# Create symlink to enable the site
+sudo ln -s /etc/nginx/sites-available/post-purchases-flow /etc/nginx/sites-enabled/
+
+# Remove default site to avoid conflicts
+sudo rm /etc/nginx/sites-enabled/default
+
+# Test config
+sudo nginx -t
+
+# Restart Nginx
+sudo systemctl restart nginx
+```
+
+### 5. Install SSL with Let's Encrypt
+
+```bash
+sudo apt install certbot python3-certbot-nginx -y
+sudo certbot --nginx -d app.yourdomain.com
+```
+
+Follow the prompts. Certbot will automatically configure HTTPS and redirect HTTP to HTTPS.
+
+### 5.1 Open Firewall Ports
+
+After SSL is set up, make sure both HTTP and HTTPS ports are open:
+
+```bash
+sudo ufw allow 80
+sudo ufw allow 443
+sudo ufw allow ssh
+sudo ufw --force enable
+sudo ufw status
+```
+
+Without port 443 open, HTTPS requests will time out with `ERR_CONNECTION_TIMED_OUT`.
+
+**Important**: Docker must be running on port **3000** (not 80) for this to work. The `deploy.sh` script already does this. If your container is on port 80, fix it:
+
+```bash
+sudo docker stop post-purchases-flow
+sudo docker rm post-purchases-flow
+sudo docker run -d \
+  --name post-purchases-flow \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  --env-file .env \
+  post-purchases-flow
+```
+
+### 6. Update .env with Your Domain
+
+```bash
+cd /var/www/shopify-post-purchases
+nano .env
+```
+
+Change:
+```env
+SHOPIFY_APP_URL=https://app.yourdomain.com
+```
+
+Then recreate the container to pick up the new env:
+
+```bash
+sudo docker stop post-purchases-flow
+sudo docker rm post-purchases-flow
+sudo docker run -d \
+  --name post-purchases-flow \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  --env-file .env \
+  post-purchases-flow
+```
+
+### 7. Update Shopify App Config
+
+On your **local machine**, update `shopify.app.checkout-plus.toml`:
+
+```toml
+application_url = "https://app.yourdomain.com"
+
+[auth]
+redirect_urls = [ "https://app.yourdomain.com/api/auth" ]
+```
+
+Then push to Shopify:
+
+```bash
+shopify app config push
+```
+
+### How It All Connects
+
+```
+Browser → https://app.yourdomain.com (port 443)
+  → Nginx (handles SSL) → proxy to localhost:3000
+    → Docker container (your app)
+```
+
+---
+
+## Nginx Commands
+
+```bash
+# Test config for errors
+sudo nginx -t
+
+# Restart Nginx
+sudo systemctl restart nginx
+
+# View Nginx status
+sudo systemctl status nginx
+
+# View Nginx error logs
+sudo tail -50 /var/log/nginx/error.log
+
+# Renew SSL certificate (auto-renews, but manual if needed)
+sudo certbot renew
+```
+
+---
+
+## Changing Domain
+
+If you need to switch to a different domain:
+
+1. Update DNS A record to point to your server IP
+2. Edit Nginx config: `sudo nano /etc/nginx/sites-available/post-purchases-flow`
+3. Change `server_name` to the new domain
+4. Run: `sudo nginx -t && sudo systemctl restart nginx`
+5. Get new SSL: `sudo certbot --nginx -d newdomain.com`
+6. Update `.env` with new `SHOPIFY_APP_URL`
+7. Recreate Docker container
+8. Update `shopify.app.checkout-plus.toml` and run `shopify app config push`
+
+---
+
 That's all you need! Just push your code to GitHub, SSH into your server, and run `./deploy.sh` to update.

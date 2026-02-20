@@ -5,7 +5,7 @@
  * Redirects to /dashboard if already logged in.
  */
 
-import { Form, Link, useActionData, redirect } from "react-router";
+import { Form, Link, useActionData, useNavigation, redirect } from "react-router";
 import prisma from "../db.server";
 import { authStyles as s } from "../dashboard/components/AuthLayout";
 import {
@@ -54,6 +54,8 @@ export const action = async ({ request }) => {
 // ─── UI ──────────────────────────────────────────────────────
 export default function SigninPage() {
   const actionData = useActionData();
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting" || navigation.state === "loading";
 
   return (
     <div style={s.page}>
@@ -70,22 +72,25 @@ export default function SigninPage() {
         <Form method="post">
           <div style={s.field}>
             <label style={s.label} htmlFor="email">Email</label>
-            <input style={s.input} id="email" name="email" type="email" placeholder="you@example.com" required />
+            <input style={s.input} id="email" name="email" type="email" placeholder="you@example.com" required disabled={isSubmitting} />
           </div>
 
           <div style={s.field}>
             <label style={s.label} htmlFor="password">Password</label>
-            <input style={s.input} id="password" name="password" type="password" placeholder="Your password" required />
+            <input style={s.input} id="password" name="password" type="password" placeholder="Your password" required disabled={isSubmitting} />
           </div>
 
           <button
             type="submit"
-            style={s.button}
-            onMouseOver={(e) => (e.target.style.background = "#0f1f4f")}
-            onMouseOut={(e) => (e.target.style.background = "#142b6f")}
+            disabled={isSubmitting}
+            style={{ ...s.button, opacity: isSubmitting ? 0.7 : 1, cursor: isSubmitting ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+            onMouseOver={(e) => !isSubmitting && (e.target.style.background = "#0f1f4f")}
+            onMouseOut={(e) => !isSubmitting && (e.target.style.background = "#142b6f")}
           >
-            Sign In
+            {isSubmitting && <span style={{ display: "inline-block", width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} />}
+            {isSubmitting ? "Signing in..." : "Sign In"}
           </button>
+          {isSubmitting && <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>}
         </Form>
 
         <div style={s.footer}>

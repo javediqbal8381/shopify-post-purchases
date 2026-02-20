@@ -72,7 +72,7 @@ create a hidden product
 3. Configure:
    - **Event:** `Order creation`
    - **Format:** `JSON`
-   - **URL:** `https://shopify-post-purchases.vercel.app/webhooks/orders/create`
+   - **URL:** `http://app.interactivecheckout.com/webhooks/orders/create`
    - **API version:** `2026-04` (latest)
 4. Click **Save**
 
@@ -218,7 +218,7 @@ Changes require redeployment to Vercel.
 
 **Check:**
 1. Webhook registered correctly (Settings → Notifications → Webhooks)
-2. URL is correct: `https://shopify-post-purchases.vercel.app/webhooks/orders/create`
+2. URL is correct: `http://app.interactivecheckout.com/webhooks/orders/create`
 3. Format is JSON
 4. Vercel backend is running (check Vercel dashboard)
 
